@@ -11,7 +11,8 @@ void main() {
 }
 
 const developerEmail = 'fastunlocked2017@gmail.com';
-const defaultContentUrl = 'https://raw.githubusercontent.com/aljwaal1/accountant-academy-content/main/academy_content.json';
+const defaultContentUrl =
+    'https://raw.githubusercontent.com/aljwaal1/accountant-academy-content/main/academy_content.json';
 const fallbackContentUrls = [
   defaultContentUrl,
   'https://raw.githubusercontent.com/aljwaal1/accountant-academy-content/refs/heads/main/academy_content.json',
@@ -57,7 +58,8 @@ class AcademyHomePage extends StatefulWidget {
 }
 
 class _AcademyHomePageState extends State<AcademyHomePage> {
-  Map<String, dynamic> content = jsonDecode(fallbackContentJson) as Map<String, dynamic>;
+  Map<String, dynamic> content =
+      jsonDecode(fallbackContentJson) as Map<String, dynamic>;
   int page = 0;
   String contentUrl = defaultContentUrl;
   String lastUpdate = 'المحتوى الداخلي';
@@ -74,7 +76,9 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString('academy_content_json');
     final savedUrl = prefs.getString('academy_content_url');
-    contentUrl = _isValidContentUrl(savedUrl) ? savedUrl!.trim() : defaultContentUrl;
+    contentUrl = _isValidContentUrl(savedUrl)
+        ? savedUrl!.trim()
+        : defaultContentUrl;
     lastUpdate = prefs.getString('academy_last_update') ?? 'المحتوى الداخلي';
     if (saved != null && saved.trim().isNotEmpty) {
       try {
@@ -135,7 +139,8 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
       final lessonCount = _lessonCount(parsed);
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
-      final updateText = '${now.year}-${_two(now.month)}-${_two(now.day)} ${_two(now.hour)}:${_two(now.minute)}';
+      final updateText =
+          '${now.year}-${_two(now.month)}-${_two(now.day)} ${_two(now.hour)}:${_two(now.minute)}';
       await prefs.setString('academy_content_json', body);
       await prefs.setString('academy_last_update', updateText);
       setState(() {
@@ -165,9 +170,17 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
       final client = HttpClient();
       try {
         final request = await client.getUrl(_cacheBustedUri(Uri.parse(url)));
-        request.headers.set(HttpHeaders.acceptHeader, 'application/json,text/plain,*/*');
-        request.headers.set(HttpHeaders.userAgentHeader, 'AccountantAcademy/1.0');
-        final response = await request.close().timeout(const Duration(seconds: 20));
+        request.headers.set(
+          HttpHeaders.acceptHeader,
+          'application/json,text/plain,*/*',
+        );
+        request.headers.set(
+          HttpHeaders.userAgentHeader,
+          'AccountantAcademy/1.0',
+        );
+        final response = await request.close().timeout(
+          const Duration(seconds: 20),
+        );
         final body = await response.transform(utf8.decoder).join();
         client.close(force: true);
         if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -210,7 +223,9 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
 
   void _message(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), behavior: SnackBarBehavior.floating));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
+    );
   }
 
   @override
@@ -229,12 +244,16 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
     ];
     return Scaffold(
       appBar: AppBar(
-        title: Text(content['appTitle']?.toString() ?? 'أكاديمية المحاسب الدولي'),
+        title: Text(
+          content['appTitle']?.toString() ?? 'أكاديمية المحاسب الدولي',
+        ),
         centerTitle: true,
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
       ),
-      body: loading ? const Center(child: CircularProgressIndicator()) : pages[page],
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : pages[page],
       bottomNavigationBar: NavigationBar(
         selectedIndex: page,
         onDestinationSelected: (v) {
@@ -242,9 +261,21 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
           setState(() => page = v);
         },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: 'الدروس'),
-          NavigationDestination(icon: Icon(Icons.cloud_sync_outlined), selectedIcon: Icon(Icons.cloud_done), label: 'تحديث'),
-          NavigationDestination(icon: Icon(Icons.mail_outline), selectedIcon: Icon(Icons.mail), label: 'المطور'),
+          NavigationDestination(
+            icon: Icon(Icons.school_outlined),
+            selectedIcon: Icon(Icons.school),
+            label: 'الدروس',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.cloud_sync_outlined),
+            selectedIcon: Icon(Icons.cloud_done),
+            label: 'تحديث',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.mail_outline),
+            selectedIcon: Icon(Icons.mail),
+            label: 'المطور',
+          ),
         ],
       ),
     );
@@ -257,11 +288,17 @@ class TracksView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tracks = (content['tracks'] as List? ?? []).cast<Map<String, dynamic>>();
+    final tracks = (content['tracks'] as List? ?? [])
+        .cast<Map<String, dynamic>>();
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _HeroCard(count: tracks.fold<int>(0, (p, t) => p + ((t['lessons'] as List?)?.length ?? 0))),
+        _HeroCard(
+          count: tracks.fold<int>(
+            0,
+            (p, t) => p + ((t['lessons'] as List?)?.length ?? 0),
+          ),
+        ),
         const SizedBox(height: 14),
         for (final track in tracks) TrackCard(track: track),
       ],
@@ -277,17 +314,33 @@ class _HeroCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF0F3D56), Color(0xFF00A6A6)]),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F3D56), Color(0xFF00A6A6)],
+        ),
         borderRadius: BorderRadius.circular(26),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.workspace_premium, color: Color(0xFFE1A83A), size: 42),
+          const Icon(
+            Icons.workspace_premium,
+            color: Color(0xFFE1A83A),
+            size: 42,
+          ),
           const SizedBox(height: 10),
-          const Text('تعلم IFRS و CMA بالعربي', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+          const Text(
+            'تعلّم المحاسبة من الأساس إلى الاحتراف',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('عدد الدروس الحالية: $count. يمكنك تحديث المحتوى من الإنترنت بدون إصدار APK جديد.', style: const TextStyle(color: Colors.white, height: 1.5)),
+          Text(
+            'عدد الدروس الحالية: $count. أقسام محاسبية متخصصة تتوسع باستمرار ويمكن تحديثها دون إصدار APK جديد.',
+            style: const TextStyle(color: Colors.white, height: 1.5),
+          ),
         ],
       ),
     );
@@ -299,7 +352,8 @@ class TrackCard extends StatelessWidget {
   final Map<String, dynamic> track;
   @override
   Widget build(BuildContext context) {
-    final lessons = (track['lessons'] as List? ?? []).cast<Map<String, dynamic>>();
+    final lessons = (track['lessons'] as List? ?? [])
+        .cast<Map<String, dynamic>>();
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
       elevation: 0,
@@ -309,24 +363,59 @@ class TrackCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              CircleAvatar(backgroundColor: const Color(0xFFE1A83A), child: Text('${lessons.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-              const SizedBox(width: 10),
-              Expanded(child: Text(track['title']?.toString() ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
-            ]),
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: const Color(0xFFE1A83A),
+                  child: Text(
+                    '${lessons.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    track['title']?.toString() ?? '',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
-            Text(track['subtitle']?.toString() ?? '', style: TextStyle(color: Colors.grey.shade700)),
+            Text(
+              track['subtitle']?.toString() ?? '',
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
             const Divider(height: 26),
             for (final lesson in lessons)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.menu_book, color: Color(0xFF00A6A6)),
-                title: Text('${lessonCode(lesson)} - ${lesson['title'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('أسئلة: ${((lesson['questions'] as List?) ?? []).length}'),
+                title: Text(
+                  '${lessonCode(lesson)} - ${lesson['title'] ?? ''}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  'أسئلة: ${((lesson['questions'] as List?) ?? []).length}',
+                ),
                 trailing: const Icon(Icons.chevron_left),
                 onTap: () {
                   SystemSound.play(SystemSoundType.click);
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => Directionality(textDirection: TextDirection.rtl, child: LessonPage(lesson: lesson))));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => Directionality(
+                        textDirection: TextDirection.rtl,
+                        child: LessonPage(lesson: lesson),
+                      ),
+                    ),
+                  );
                 },
               ),
           ],
@@ -348,27 +437,49 @@ class _LessonPageState extends State<LessonPage> {
   @override
   Widget build(BuildContext context) {
     final lesson = widget.lesson;
-    final views = [SummaryView(lesson: lesson), LongView(lesson: lesson), QuizView(lesson: lesson)];
+    final views = [
+      SummaryView(lesson: lesson),
+      LongView(lesson: lesson),
+      QuizView(lesson: lesson),
+    ];
     return Scaffold(
-      appBar: AppBar(title: Text(lessonCode(lesson)), backgroundColor: const Color(0xFF0F3D56), foregroundColor: Colors.white),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(value: 0, label: Text('ملخص'), icon: Icon(Icons.short_text)),
-              ButtonSegment(value: 1, label: Text('شرح'), icon: Icon(Icons.article_outlined)),
-              ButtonSegment(value: 2, label: Text('اختبار'), icon: Icon(Icons.quiz_outlined)),
-            ],
-            selected: {tab},
-            onSelectionChanged: (s) {
-              SystemSound.play(SystemSoundType.click);
-              setState(() => tab = s.first);
-            },
+      appBar: AppBar(
+        title: Text(lessonCode(lesson)),
+        backgroundColor: const Color(0xFF0F3D56),
+        foregroundColor: Colors.white,
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(
+                  value: 0,
+                  label: Text('ملخص'),
+                  icon: Icon(Icons.short_text),
+                ),
+                ButtonSegment(
+                  value: 1,
+                  label: Text('شرح'),
+                  icon: Icon(Icons.article_outlined),
+                ),
+                ButtonSegment(
+                  value: 2,
+                  label: Text('اختبار'),
+                  icon: Icon(Icons.quiz_outlined),
+                ),
+              ],
+              selected: {tab},
+              onSelectionChanged: (s) {
+                SystemSound.play(SystemSoundType.click);
+                setState(() => tab = s.first);
+              },
+            ),
           ),
-        ),
-        Expanded(child: views[tab]),
-      ]),
+          Expanded(child: views[tab]),
+        ],
+      ),
     );
   }
 }
@@ -378,12 +489,20 @@ class SummaryView extends StatelessWidget {
   final Map<String, dynamic> lesson;
   @override
   Widget build(BuildContext context) {
-    final summary = (lesson['summary'] as List? ?? []).map((e) => e.toString()).toList();
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      Text(lesson['title']?.toString() ?? '', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 12),
-      for (final item in summary) _Bullet(text: item),
-    ]);
+    final summary = (lesson['summary'] as List? ?? [])
+        .map((e) => e.toString())
+        .toList();
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          lesson['title']?.toString() ?? '',
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        for (final item in summary) _Bullet(text: item),
+      ],
+    );
   }
 }
 
@@ -392,16 +511,24 @@ class LongView extends StatelessWidget {
   final Map<String, dynamic> lesson;
   @override
   Widget build(BuildContext context) {
-    final paragraphs = (lesson['longExplanation'] as List? ?? []).map((e) => e.toString()).toList();
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      for (final p in paragraphs)
-        Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-          child: Text(p, style: const TextStyle(fontSize: 16, height: 1.7)),
-        ),
-    ]);
+    final paragraphs = (lesson['longExplanation'] as List? ?? [])
+        .map((e) => e.toString())
+        .toList();
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        for (final p in paragraphs)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Text(p, style: const TextStyle(fontSize: 16, height: 1.7)),
+          ),
+      ],
+    );
   }
 }
 
@@ -418,32 +545,67 @@ class _QuizViewState extends State<QuizView> {
 
   @override
   Widget build(BuildContext context) {
-    final questions = (widget.lesson['questions'] as List? ?? []).cast<Map<String, dynamic>>();
-    if (questions.isEmpty) return const Center(child: Text('لا توجد أسئلة بعد.'));
-    final score = selected.entries.where((e) => questions[e.key]['answer'] == e.value).length;
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      if (finished)
-        Container(
-          padding: const EdgeInsets.all(16),
-          margin: const EdgeInsets.only(bottom: 14),
-          decoration: BoxDecoration(color: const Color(0xFFE1A83A), borderRadius: BorderRadius.circular(18)),
-          child: Text('نتيجتك: $score من ${questions.length}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+    final questions = (widget.lesson['questions'] as List? ?? [])
+        .cast<Map<String, dynamic>>();
+    if (questions.isEmpty)
+      return const Center(child: Text('لا توجد أسئلة بعد.'));
+    final score = selected.entries
+        .where((e) => questions[e.key]['answer'] == e.value)
+        .length;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (finished)
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE1A83A),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Text(
+              'نتيجتك: $score من ${questions.length}',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        for (int i = 0; i < questions.length; i++)
+          _QuestionCard(
+            index: i,
+            data: questions[i],
+            selected: selected[i],
+            finished: finished,
+            onSelect: (v) {
+              SystemSound.play(SystemSoundType.click);
+              setState(() => selected[i] = v);
+            },
+          ),
+        FilledButton.icon(
+          onPressed: selected.length == questions.length
+              ? () {
+                  SystemSound.play(SystemSoundType.alert);
+                  setState(() => finished = true);
+                }
+              : null,
+          icon: const Icon(Icons.check_circle_outline),
+          label: const Text('إنهاء الاختبار وعرض الشرح'),
         ),
-      for (int i = 0; i < questions.length; i++) _QuestionCard(index: i, data: questions[i], selected: selected[i], finished: finished, onSelect: (v) {
-        SystemSound.play(SystemSoundType.click);
-        setState(() => selected[i] = v);
-      }),
-      FilledButton.icon(
-        onPressed: selected.length == questions.length ? () { SystemSound.play(SystemSoundType.alert); setState(() => finished = true); } : null,
-        icon: const Icon(Icons.check_circle_outline),
-        label: const Text('إنهاء الاختبار وعرض الشرح'),
-      ),
-    ]);
+      ],
+    );
   }
 }
 
 class _QuestionCard extends StatelessWidget {
-  const _QuestionCard({required this.index, required this.data, required this.selected, required this.finished, required this.onSelect});
+  const _QuestionCard({
+    required this.index,
+    required this.data,
+    required this.selected,
+    required this.finished,
+    required this.onSelect,
+  });
   final int index;
   final Map<String, dynamic> data;
   final int? selected;
@@ -451,7 +613,9 @@ class _QuestionCard extends StatelessWidget {
   final ValueChanged<int> onSelect;
   @override
   Widget build(BuildContext context) {
-    final options = (data['options'] as List? ?? []).map((e) => e.toString()).toList();
+    final options = (data['options'] as List? ?? [])
+        .map((e) => e.toString())
+        .toList();
     final answer = data['answer'] as int? ?? -1;
     return Card(
       elevation: 0,
@@ -459,28 +623,39 @@ class _QuestionCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('س${index + 1}: ${data['q'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 8),
-          for (int i = 0; i < options.length; i++)
-            RadioListTile<int>(
-              value: i,
-              groupValue: selected,
-              onChanged: finished ? null : (v) => onSelect(v ?? i),
-              title: Text(options[i]),
-              activeColor: const Color(0xFF00A6A6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'س${index + 1}: ${data['q'] ?? ''}',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-          if (finished)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: selected == answer ? const Color(0xFFE9F8F4) : const Color(0xFFFFF1F0),
-                borderRadius: BorderRadius.circular(14),
+            const SizedBox(height: 8),
+            for (int i = 0; i < options.length; i++)
+              RadioListTile<int>(
+                value: i,
+                groupValue: selected,
+                onChanged: finished ? null : (v) => onSelect(v ?? i),
+                title: Text(options[i]),
+                activeColor: const Color(0xFF00A6A6),
               ),
-              child: Text('الإجابة الصحيحة: ${answer >= 0 && answer < options.length ? options[answer] : ''}\n${data['explanation'] ?? ''}', style: const TextStyle(height: 1.5)),
-            ),
-        ]),
+            if (finished)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: selected == answer
+                      ? const Color(0xFFE9F8F4)
+                      : const Color(0xFFFFF1F0),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  'الإجابة الصحيحة: ${answer >= 0 && answer < options.length ? options[answer] : ''}\n${data['explanation'] ?? ''}',
+                  style: const TextStyle(height: 1.5),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -494,12 +669,18 @@ class _Bullet extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Icon(Icons.check_circle, color: Color(0xFF00A6A6)),
-        const SizedBox(width: 10),
-        Expanded(child: Text(text, style: const TextStyle(height: 1.5))),
-      ]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.check_circle, color: Color(0xFF00A6A6)),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: const TextStyle(height: 1.5))),
+        ],
+      ),
     );
   }
 }
@@ -530,7 +711,9 @@ class UpdateContentView extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF0F3D56), Color(0xFF00A6A6)]),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F3D56), Color(0xFF00A6A6)],
+            ),
             borderRadius: BorderRadius.circular(26),
           ),
           child: const Column(
@@ -538,9 +721,19 @@ class UpdateContentView extends StatelessWidget {
             children: [
               Icon(Icons.auto_stories, color: Color(0xFFE1A83A), size: 44),
               SizedBox(height: 12),
-              Text('تحديث الدروس والأسئلة', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.bold)),
+              Text(
+                'تحديث الدروس والأسئلة',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 23,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               SizedBox(height: 8),
-              Text('يتم تحديث التطبيق بالمعلومات والشروحات والأسئلة بشكل دوري، ويمكنك التحقق من وجود محتوى جديد من هنا.', style: TextStyle(color: Colors.white, height: 1.6)),
+              Text(
+                'يتم تحديث التطبيق بالمعلومات والشروحات والأسئلة بشكل دوري، ويمكنك التحقق من وجود محتوى جديد من هنا.',
+                style: TextStyle(color: Colors.white, height: 1.6),
+              ),
             ],
           ),
         ),
@@ -575,7 +768,10 @@ class _LastCheckCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -588,9 +784,15 @@ class _LastCheckCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('آخر محاولة تحديث', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Text(
+                  'آخر محاولة تحديث',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
                 const SizedBox(height: 4),
-                Text(updateStatus, style: TextStyle(color: Colors.grey.shade700, height: 1.4)),
+                Text(
+                  updateStatus,
+                  style: TextStyle(color: Colors.grey.shade700, height: 1.4),
+                ),
               ],
             ),
           ),
@@ -609,21 +811,37 @@ class _UpdateStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: isInternal ? const Color(0xFFE1A83A) : const Color(0xFF00A6A6),
-            child: Icon(isInternal ? Icons.menu_book : Icons.verified, color: Colors.white),
+            backgroundColor: isInternal
+                ? const Color(0xFFE1A83A)
+                : const Color(0xFF00A6A6),
+            child: Icon(
+              isInternal ? Icons.menu_book : Icons.verified,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('حالة المحتوى', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Text(
+                  'حالة المحتوى',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
                 const SizedBox(height: 4),
-                Text(isInternal ? 'أنت تستخدم المحتوى الأساسي المرفق مع التطبيق.' : 'آخر تحديث للمحتوى: $lastUpdate', style: TextStyle(color: Colors.grey.shade700, height: 1.4)),
+                Text(
+                  isInternal
+                      ? 'أنت تستخدم المحتوى الأساسي المرفق مع التطبيق.'
+                      : 'آخر تحديث للمحتوى: $lastUpdate',
+                  style: TextStyle(color: Colors.grey.shade700, height: 1.4),
+                ),
               ],
             ),
           ),
@@ -639,8 +857,14 @@ class _HelpBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-      child: const Text('ملاحظة: يتم إضافة شروحات وأسئلة جديدة بشكل دوري. عند الضغط على زر التحديث سيحاول التطبيق جلب أحدث محتوى متاح، وإذا لم يتوفر اتصال بالإنترنت سيبقى المحتوى الموجود محفوظًا على جهازك.', style: TextStyle(height: 1.6)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: const Text(
+        'ملاحظة: يتم إضافة شروحات وأسئلة جديدة بشكل دوري. عند الضغط على زر التحديث سيحاول التطبيق جلب أحدث محتوى متاح، وإذا لم يتوفر اتصال بالإنترنت سيبقى المحتوى الموجود محفوظًا على جهازك.',
+        style: TextStyle(height: 1.6),
+      ),
     );
   }
 }
@@ -658,32 +882,46 @@ class _DeveloperViewState extends State<DeveloperView> {
     controller.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      const Icon(Icons.support_agent, size: 72, color: Color(0xFF0F3D56)),
-      const SizedBox(height: 10),
-      const Text('مراسلة المطور', textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8),
-      const Text(developerEmail, textAlign: TextAlign.center),
-      const SizedBox(height: 16),
-      TextField(
-        controller: controller,
-        minLines: 5,
-        maxLines: 8,
-        decoration: InputDecoration(hintText: 'اكتب ملاحظتك هنا...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(18))),
-      ),
-      const SizedBox(height: 12),
-      FilledButton.icon(
-        onPressed: () {
-          final msg = 'إلى: $developerEmail\n\nملاحظة على تطبيق أكاديمية المحاسب الدولي:\n${controller.text}';
-          Clipboard.setData(ClipboardData(text: msg));
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ الرسالة والبريد')));
-        },
-        icon: const Icon(Icons.copy),
-        label: const Text('نسخ الرسالة'),
-      ),
-    ]);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Icon(Icons.support_agent, size: 72, color: Color(0xFF0F3D56)),
+        const SizedBox(height: 10),
+        const Text(
+          'مراسلة المطور',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        const Text(developerEmail, textAlign: TextAlign.center),
+        const SizedBox(height: 16),
+        TextField(
+          controller: controller,
+          minLines: 5,
+          maxLines: 8,
+          decoration: InputDecoration(
+            hintText: 'اكتب ملاحظتك هنا...',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: () {
+            final msg =
+                'إلى: $developerEmail\n\nملاحظة على تطبيق أكاديمية المحاسب الدولي:\n${controller.text}';
+            Clipboard.setData(ClipboardData(text: msg));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('تم نسخ الرسالة والبريد')),
+            );
+          },
+          icon: const Icon(Icons.copy),
+          label: const Text('نسخ الرسالة'),
+        ),
+      ],
+    );
   }
 }
 
