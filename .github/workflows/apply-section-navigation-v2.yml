@@ -1,0 +1,45 @@
+name: Apply Section Navigation V2
+
+on:
+  push:
+    branches:
+      - section-navigation-v2
+    paths:
+      - scripts/apply_section_navigation_v2.py
+      - .github/workflows/apply-section-navigation-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-navigation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: section-navigation-v2
+          fetch-depth: 0
+
+      - name: Apply navigation redesign
+        run: python3 scripts/apply_section_navigation_v2.py
+
+      - name: Validate expected structure
+        run: |
+          grep -q "class SectionCard" lib/main.dart
+          grep -q "class TrackLessonsPage" lib/main.dart
+          grep -q "اختر القسم" lib/main.dart
+          ! grep -q "for (final track in tracks) TrackCard" lib/main.dart
+
+      - name: Commit generated application changes
+        run: |
+          if git diff --quiet -- lib/main.dart; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/main.dart
+          git commit -m "Redesign academy navigation by accounting section"
+          git push origin section-navigation-v2
