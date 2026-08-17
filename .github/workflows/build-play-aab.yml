@@ -1,0 +1,178 @@
+name: Build Google Play AAB
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-play-aab:
+    name: Build signed Android App Bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter 3.44.7
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.7"
+          channel: stable
+          cache: true
+
+      - name: Install Android API 36
+        shell: bash
+        run: sdkmanager "platforms;android-36"
+
+      - name: Create Android project files
+        run: flutter create --platforms=android --org com.explapp --no-pub .
+
+      - name: Remove generated sample tests
+        run: rm -rf test
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Validate signing secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required GitHub secret: ${name}"
+              exit 1
+            fi
+          done
+
+      - name: Configure Android app for Google Play
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+          cat > android/app/src/main/AndroidManifest.xml <<'MANIFEST'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:label="أكاديمية المحاسب"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:usesCleartextTraffic="false"
+                  android:supportsRtl="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:taskAffinity=""
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <meta-data
+                          android:name="io.flutter.embedding.android.NormalTheme"
+                          android:resource="@style/NormalTheme" />
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <meta-data android:name="flutterEmbedding" android:value="2" />
+              </application>
+          </manifest>
+          MANIFEST
+
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp "launcher_icons/mipmap-${density}/ic_launcher.png" "android/app/src/main/res/mipmap-${density}/ic_launcher.png"
+            cp "launcher_icons/mipmap-${density}/ic_launcher_round.png" "android/app/src/main/res/mipmap-${density}/ic_launcher_round.png"
+          done
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          kts = Path('android/app/build.gradle.kts')
+          groovy = Path('android/app/build.gradle')
+
+          if kts.exists():
+              text = kts.read_text()
+              text = text.replace('namespace = "com.explapp.accountant_academy_dynamic"', 'namespace = "com.explapp.accountantacademy"')
+              text = text.replace('applicationId = "com.explapp.accountant_academy_dynamic"', 'applicationId = "com.explapp.accountantacademy"')
+              text = text.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
+              text = text.replace('minSdk = flutter.minSdkVersion', 'minSdk = 23')
+              text = text.replace('targetSdk = flutter.targetSdkVersion', 'targetSdk = 36')
+
+              header = '''import java.util.Properties\nimport java.io.FileInputStream\n\nval keystoreProperties = Properties()\nval keystorePropertiesFile = rootProject.file("key.properties")\nkeystoreProperties.load(FileInputStream(keystorePropertiesFile))\n\n'''
+              if 'val keystoreProperties = Properties()' not in text:
+                  text = header + text
+
+              marker = '    buildTypes {'
+              signing = '''    signingConfigs {\n        create("release") {\n            keyAlias = keystoreProperties["keyAlias"] as String\n            keyPassword = keystoreProperties["keyPassword"] as String\n            storeFile = file(keystoreProperties["storeFile"] as String)\n            storePassword = keystoreProperties["storePassword"] as String\n        }\n    }\n\n'''
+              if 'create("release")' not in text:
+                  text = text.replace(marker, signing + marker)
+              text = text.replace('signingConfig = signingConfigs.getByName("debug")', 'signingConfig = signingConfigs.getByName("release")')
+              kts.write_text(text)
+          elif groovy.exists():
+              text = groovy.read_text()
+              text = text.replace('namespace "com.explapp.accountant_academy_dynamic"', 'namespace "com.explapp.accountantacademy"')
+              text = text.replace('applicationId "com.explapp.accountant_academy_dynamic"', 'applicationId "com.explapp.accountantacademy"')
+              text = text.replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36')
+              text = text.replace('minSdkVersion flutter.minSdkVersion', 'minSdkVersion 23')
+              text = text.replace('targetSdkVersion flutter.targetSdkVersion', 'targetSdkVersion 36')
+
+              header = '''def keystoreProperties = new Properties()\ndef keystorePropertiesFile = rootProject.file('key.properties')\nkeystoreProperties.load(new FileInputStream(keystorePropertiesFile))\n\n'''
+              if 'def keystoreProperties = new Properties()' not in text:
+                  text = header + text
+
+              marker = '    buildTypes {'
+              signing = '''    signingConfigs {\n        release {\n            keyAlias keystoreProperties['keyAlias']\n            keyPassword keystoreProperties['keyPassword']\n            storeFile file(keystoreProperties['storeFile'])\n            storePassword keystoreProperties['storePassword']\n        }\n    }\n\n'''
+              if 'signingConfigs {' not in text:
+                  text = text.replace(marker, signing + marker)
+              text = text.replace('signingConfig signingConfigs.debug', 'signingConfig signingConfigs.release')
+              groovy.write_text(text)
+          else:
+              raise SystemExit('No Android app Gradle file found')
+          PY
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Build signed release AAB
+        run: flutter build appbundle --release
+
+      - name: Verify AAB signature
+        shell: bash
+        run: jarsigner -verify -verbose -certs build/app/outputs/bundle/release/app-release.aab
+
+      - name: Upload Google Play AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: accountant-academy-google-play-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 14
