@@ -2,6 +2,9 @@ name: Build Google Play AAB
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - play-release-prep-2026-08-17
 
 permissions:
   contents: read
