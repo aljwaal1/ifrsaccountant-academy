@@ -121,7 +121,6 @@ jobs:
 
           if kts.exists():
               text = kts.read_text()
-              text = text.replace('namespace = "com.explapp.accountant_academy_dynamic"', 'namespace = "com.explapp.accountantacademy"')
               text = text.replace('applicationId = "com.explapp.accountant_academy_dynamic"', 'applicationId = "com.explapp.accountantacademy"')
               text = text.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
               text = text.replace('minSdk = flutter.minSdkVersion', 'minSdk = 23')
@@ -139,7 +138,6 @@ jobs:
               kts.write_text(text)
           elif groovy.exists():
               text = groovy.read_text()
-              text = text.replace('namespace "com.explapp.accountant_academy_dynamic"', 'namespace "com.explapp.accountantacademy"')
               text = text.replace('applicationId "com.explapp.accountant_academy_dynamic"', 'applicationId "com.explapp.accountantacademy"')
               text = text.replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36')
               text = text.replace('minSdkVersion flutter.minSdkVersion', 'minSdkVersion 23')
