@@ -1,0 +1,48 @@
+name: Generate Google Play Screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - play-release-prep-2026-08-17
+    paths:
+      - 'test/store_screenshots_test.dart'
+      - '.github/workflows/generate-store-screenshots.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter 3.44.7
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.7'
+          channel: stable
+          cache: true
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Download current academy content
+        shell: bash
+        run: |
+          mkdir -p store_assets
+          curl -fL --retry 3 \
+            https://raw.githubusercontent.com/aljwaal1/accountant-academy-content/main/academy_content.json \
+            -o store_assets/academy_content.json
+
+      - name: Generate actual Flutter UI screenshots
+        run: flutter test --update-goldens test/store_screenshots_test.dart
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: accountant-academy-google-play-screenshots
+          path: test/goldens
+          if-no-files-found: error
+          retention-days: 1
