@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-play-aab:
-    name: Build signed Android App Bundle
+    name: Build Android App Bundle
     runs-on: ubuntu-latest
 
     steps:
@@ -44,39 +44,10 @@ jobs:
       - name: Get packages
         run: flutter pub get
 
-      - name: Validate signing secrets
-        shell: bash
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
-            if [ -z "${!name:-}" ]; then
-              echo "Missing required GitHub secret: ${name}"
-              exit 1
-            fi
-          done
-
       - name: Configure Android app for Google Play
         shell: bash
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-          cat > android/key.properties <<EOF
-          storePassword=$KEYSTORE_PASSWORD
-          keyPassword=$KEY_PASSWORD
-          keyAlias=$KEY_ALIAS
-          storeFile=upload-keystore.jks
-          EOF
 
           cat > android/app/src/main/AndroidManifest.xml <<'MANIFEST'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -128,16 +99,6 @@ jobs:
               text = text.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
               text = text.replace('minSdk = flutter.minSdkVersion', 'minSdk = 23')
               text = text.replace('targetSdk = flutter.targetSdkVersion', 'targetSdk = 36')
-
-              properties = '''\nval keystoreProperties = java.util.Properties()\nval keystorePropertiesFile = rootProject.file("key.properties")\nkeystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))\n'''
-              if 'val keystoreProperties = java.util.Properties()' not in text:
-                  text = text.replace('\nandroid {', properties + '\nandroid {', 1)
-
-              marker = '    buildTypes {'
-              signing = '''    signingConfigs {\n        create("release") {\n            keyAlias = keystoreProperties["keyAlias"] as String\n            keyPassword = keystoreProperties["keyPassword"] as String\n            storeFile = file(keystoreProperties["storeFile"] as String)\n            storePassword = keystoreProperties["storePassword"] as String\n        }\n    }\n\n'''
-              if 'create("release")' not in text:
-                  text = text.replace(marker, signing + marker, 1)
-              text = text.replace('signingConfig = signingConfigs.getByName("debug")', 'signingConfig = signingConfigs.getByName("release")')
               kts.write_text(text)
           elif groovy.exists():
               text = groovy.read_text()
@@ -145,16 +106,6 @@ jobs:
               text = text.replace('compileSdk flutter.compileSdkVersion', 'compileSdk 36')
               text = text.replace('minSdkVersion flutter.minSdkVersion', 'minSdkVersion 23')
               text = text.replace('targetSdkVersion flutter.targetSdkVersion', 'targetSdkVersion 36')
-
-              properties = '''\ndef keystoreProperties = new java.util.Properties()\ndef keystorePropertiesFile = rootProject.file('key.properties')\nkeystoreProperties.load(new java.io.FileInputStream(keystorePropertiesFile))\n'''
-              if 'def keystoreProperties = new java.util.Properties()' not in text:
-                  text = text.replace('\nandroid {', properties + '\nandroid {', 1)
-
-              marker = '    buildTypes {'
-              signing = '''    signingConfigs {\n        release {\n            keyAlias keystoreProperties['keyAlias']\n            keyPassword keystoreProperties['keyPassword']\n            storeFile file(keystoreProperties['storeFile'])\n            storePassword keystoreProperties['storePassword']\n        }\n    }\n\n'''
-              if 'signingConfigs {' not in text:
-                  text = text.replace(marker, signing + marker, 1)
-              text = text.replace('signingConfig signingConfigs.debug', 'signingConfig signingConfigs.release')
               groovy.write_text(text)
           else:
               raise SystemExit('No Android app Gradle file found')
@@ -163,17 +114,13 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      - name: Build signed release AAB
+      - name: Build release AAB with temporary build signature
         run: flutter build appbundle --release
 
-      - name: Verify AAB signature
-        shell: bash
-        run: jarsigner -verify -verbose -certs build/app/outputs/bundle/release/app-release.aab
-
-      - name: Upload Google Play AAB artifact
+      - name: Upload AAB artifact for final local signing
         uses: actions/upload-artifact@v4
         with:
-          name: accountant-academy-google-play-aab
+          name: accountant-academy-aab-for-final-signing
           path: build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
