@@ -127,14 +127,14 @@ jobs:
               text = text.replace('minSdk = flutter.minSdkVersion', 'minSdk = 23')
               text = text.replace('targetSdk = flutter.targetSdkVersion', 'targetSdk = 36')
 
-              header = '''import java.util.Properties\nimport java.io.FileInputStream\n\nval keystoreProperties = Properties()\nval keystorePropertiesFile = rootProject.file("key.properties")\nkeystoreProperties.load(FileInputStream(keystorePropertiesFile))\n\n'''
-              if 'val keystoreProperties = Properties()' not in text:
-                  text = header + text
+              properties = '''\nval keystoreProperties = java.util.Properties()\nval keystorePropertiesFile = rootProject.file("key.properties")\nkeystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))\n'''
+              if 'val keystoreProperties = java.util.Properties()' not in text:
+                  text = text.replace('\nandroid {', properties + '\nandroid {', 1)
 
               marker = '    buildTypes {'
               signing = '''    signingConfigs {\n        create("release") {\n            keyAlias = keystoreProperties["keyAlias"] as String\n            keyPassword = keystoreProperties["keyPassword"] as String\n            storeFile = file(keystoreProperties["storeFile"] as String)\n            storePassword = keystoreProperties["storePassword"] as String\n        }\n    }\n\n'''
               if 'create("release")' not in text:
-                  text = text.replace(marker, signing + marker)
+                  text = text.replace(marker, signing + marker, 1)
               text = text.replace('signingConfig = signingConfigs.getByName("debug")', 'signingConfig = signingConfigs.getByName("release")')
               kts.write_text(text)
           elif groovy.exists():
@@ -145,14 +145,14 @@ jobs:
               text = text.replace('minSdkVersion flutter.minSdkVersion', 'minSdkVersion 23')
               text = text.replace('targetSdkVersion flutter.targetSdkVersion', 'targetSdkVersion 36')
 
-              header = '''def keystoreProperties = new Properties()\ndef keystorePropertiesFile = rootProject.file('key.properties')\nkeystoreProperties.load(new FileInputStream(keystorePropertiesFile))\n\n'''
-              if 'def keystoreProperties = new Properties()' not in text:
-                  text = header + text
+              properties = '''\ndef keystoreProperties = new java.util.Properties()\ndef keystorePropertiesFile = rootProject.file('key.properties')\nkeystoreProperties.load(new java.io.FileInputStream(keystorePropertiesFile))\n'''
+              if 'def keystoreProperties = new java.util.Properties()' not in text:
+                  text = text.replace('\nandroid {', properties + '\nandroid {', 1)
 
               marker = '    buildTypes {'
               signing = '''    signingConfigs {\n        release {\n            keyAlias keystoreProperties['keyAlias']\n            keyPassword keystoreProperties['keyPassword']\n            storeFile file(keystoreProperties['storeFile'])\n            storePassword keystoreProperties['storePassword']\n        }\n    }\n\n'''
               if 'signingConfigs {' not in text:
-                  text = text.replace(marker, signing + marker)
+                  text = text.replace(marker, signing + marker, 1)
               text = text.replace('signingConfig signingConfigs.debug', 'signingConfig signingConfigs.release')
               groovy.write_text(text)
           else:
