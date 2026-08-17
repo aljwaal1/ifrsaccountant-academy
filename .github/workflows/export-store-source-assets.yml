@@ -1,0 +1,24 @@
+name: Export Store Source Assets
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - play-release-prep-2026-08-17
+    paths:
+      - '.github/workflows/export-store-source-assets.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload original high resolution app icon
+        uses: actions/upload-artifact@v4
+        with:
+          name: accountant-academy-original-icon
+          path: assets/app_icon/accountant_academy_icon_1024.png
+          retention-days: 1
