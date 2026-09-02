@@ -7,6 +7,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ad_service.dart';
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const AccountantAcademyApp());
@@ -605,7 +607,7 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
 
   Future<void> _load(int width) async {
     try {
-      await MobileAds.instance.initialize();
+      if (!await AdService.instance.initialize()) return;
       final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
     if (!mounted || size == null) return;
     await _banner?.dispose();
