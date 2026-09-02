@@ -57,7 +57,7 @@ jobs:
           gradle = Path('android/app/build.gradle.kts')
           g = gradle.read_text()
           g = g.replace('applicationId = "com.explapp.accountant_academy_dynamic"', 'applicationId = "com.explapp.accountantacademy"')
-          g = g.replace('minSdk = flutter.minSdkVersion', 'minSdk = 23')
+          g = g.replace('minSdk = flutter.minSdkVersion', 'minSdk = 24')
           g = g.replace('signingConfig = signingConfigs.getByName("debug")', '')
           if 'androidx.work:work-runtime:2.11.2' not in g:
               g += '\n\ndependencies {\n    implementation("androidx.work:work-runtime:2.11.2")\n}\n'
