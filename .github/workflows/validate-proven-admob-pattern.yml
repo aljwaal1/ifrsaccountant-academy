@@ -88,13 +88,13 @@ jobs:
         working-directory: android
         run: |
           ./gradlew app:assembleRelease app:bundleRelease
-          find app/build/outputs -type f \( -name '*.apk' -o -name '*.aab' \) -print
+          find ../build -type f \( -name '*.apk' -o -name '*.aab' \) -print
 
       - name: Collect unsigned artifacts
         run: |
           mkdir -p output
-          APK=$(find android/app/build/outputs -type f -name '*release*.apk' | head -1)
-          AAB=$(find android/app/build/outputs -type f -name '*release*.aab' | head -1)
+          APK=$(find build -type f -name '*release*.apk' | head -1)
+          AAB=$(find build -type f -name '*release*.aab' | head -1)
           test -n "$APK"
           test -n "$AAB"
           cp "$APK" output/accountant-academy-v1.0.1-unsigned.apk
