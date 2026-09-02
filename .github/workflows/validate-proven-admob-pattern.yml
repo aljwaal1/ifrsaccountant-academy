@@ -1,0 +1,107 @@
+name: Validate Proven AdMob Pattern
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ux-onboarding-ads-2026-09-02
+    paths:
+      - 'scripts/apply_proven_admob_pattern.py'
+      - 'lib/ad_service.dart'
+      - '.github/workflows/validate-proven-admob-pattern.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ux-onboarding-ads-2026-09-02
+
+      - name: Apply proven Matching AdMob pattern
+        run: python3 scripts/apply_proven_admob_pattern.py
+
+      - name: Commit source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -- lib/main.dart pubspec.yaml
+          if ! git diff --cached --quiet; then
+            git commit -m "Use proven AdMob initialization pattern"
+            git push
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.7'
+          channel: stable
+          cache: true
+
+      - name: Generate Android project
+        run: flutter create --platforms=android --org com.explapp --no-pub .
+
+      - name: Configure Android exactly like proven app
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          gradle = Path('android/app/build.gradle.kts')
+          g = gradle.read_text()
+          g = g.replace('applicationId = "com.explapp.accountant_academy_dynamic"', 'applicationId = "com.explapp.accountantacademy"')
+          g = g.replace('minSdk = flutter.minSdkVersion', 'minSdk = 23')
+          g = g.replace('signingConfig = signingConfigs.getByName("debug")', '')
+          if 'androidx.work:work-runtime:2.11.2' not in g:
+              g += '\n\ndependencies {\n    implementation("androidx.work:work-runtime:2.11.2")\n}\n'
+          gradle.write_text(g)
+
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          m = manifest.read_text()
+          if 'android.permission.INTERNET' not in m:
+              m = m.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">', '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />', 1)
+          if 'com.google.android.gms.ads.APPLICATION_ID' not in m:
+              m = m.replace('</application>', '        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>\n    </application>', 1)
+          manifest.write_text(m)
+          PY
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Analyze Dart
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Verify WorkManager pin
+        working-directory: android
+        run: |
+          ./gradlew app:dependencyInsight --dependency androidx.work:work-runtime --configuration releaseRuntimeClasspath | tee /tmp/workmanager.txt
+          grep -q 'androidx.work:work-runtime:2.11.2' /tmp/workmanager.txt
+
+      - name: Build unsigned release APK and AAB
+        working-directory: android
+        run: |
+          ./gradlew app:assembleRelease app:bundleRelease
+          find app/build/outputs -type f \( -name '*.apk' -o -name '*.aab' \) -print
+
+      - name: Collect unsigned artifacts
+        run: |
+          mkdir -p output
+          APK=$(find android/app/build/outputs -type f -name '*release*.apk' | head -1)
+          AAB=$(find android/app/build/outputs -type f -name '*release*.aab' | head -1)
+          test -n "$APK"
+          test -n "$AAB"
+          cp "$APK" output/accountant-academy-v1.0.1-unsigned.apk
+          cp "$AAB" output/accountant-academy-v1.0.1-unsigned.aab
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: accountant-academy-proven-admob-unsigned
+          path: output/*
+          retention-days: 1
