@@ -1,7 +1,7 @@
 name: accountant_academy_dynamic
 description: أكاديمية المحاسب الدولي مع تحديث محتوى خارجي عبر JSON.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
