@@ -6,7 +6,8 @@ on:
     branches:
       - ux-onboarding-ads-2026-09-02
     paths:
-      - 'scripts/apply_ux_onboarding_ads.py'
+      - 'pubspec.yaml'
+      - 'lib/main.dart'
       - '.github/workflows/validate-ux-onboarding-ads.yml'
 
 permissions:
@@ -19,19 +20,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ux-onboarding-ads-2026-09-02
-
-      - name: Apply UX patch
-        run: python3 scripts/apply_ux_onboarding_ads.py
-
-      - name: Commit app changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -- lib/main.dart pubspec.yaml
-          if ! git diff --cached --quiet; then
-            git commit -m "Upgrade onboarding developer contact update reminder and ads"
-            git push
-          fi
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
