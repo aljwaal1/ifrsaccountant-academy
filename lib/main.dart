@@ -284,8 +284,6 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const AcademyAdBanner(),
-          Divider(height: 1, color: Colors.grey.shade300),
           NavigationBar(
             selectedIndex: page,
             onDestinationSelected: (v) {
@@ -315,6 +313,11 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
                 label: 'المطور',
               ),
             ],
+          ),
+          Divider(height: 1, color: Colors.grey.shade300),
+          const SafeArea(
+            top: false,
+            child: AcademyAdBanner(),
           ),
         ],
       ),
