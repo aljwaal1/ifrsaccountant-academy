@@ -713,6 +713,8 @@ class TracksView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 18),
+        const AcademyAdBanner(),
+        const SizedBox(height: 18),
         const Text(
           'اختر القسم',
           style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
