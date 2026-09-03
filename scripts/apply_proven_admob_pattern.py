@@ -17,7 +17,6 @@ if old_init in s:
 elif "if (!await AdService.instance.initialize()) return;" not in s:
     raise SystemExit('banner initialization marker missing')
 
-# Keep banner compact inside Scaffold.bottomNavigationBar.
 old_banner = """    return Container(\n      color: Colors.white,\n      padding: const EdgeInsets.only(top: 6, bottom: 6),\n      alignment: Alignment.center,\n      child: SizedBox(\n        width: ad.size.width.toDouble(),\n        height: ad.size.height.toDouble(),\n        child: AdWidget(ad: ad),\n      ),\n    );"""
 new_banner = """    return SizedBox(\n      width: double.infinity,\n      height: ad.size.height.toDouble() + 12,\n      child: ColoredBox(\n        color: Colors.white,\n        child: Center(\n          child: SizedBox(\n            width: ad.size.width.toDouble(),\n            height: ad.size.height.toDouble(),\n            child: AdWidget(ad: ad),\n          ),\n        ),\n      ),\n    );"""
 if old_banner in s:
@@ -25,7 +24,6 @@ if old_banner in s:
 elif "height: ad.size.height.toDouble() + 12" not in s:
     raise SystemExit('banner layout marker missing')
 
-# On the home page put the navigation menu first and the ad below it.
 old_home_order = """        children: [\n          const AcademyAdBanner(),\n          Divider(height: 1, color: Colors.grey.shade300),\n          NavigationBar("""
 new_home_order = """        children: [\n          NavigationBar("""
 if old_home_order in s:
@@ -38,7 +36,14 @@ if "const SafeArea(\n            top: false,\n            child: AcademyAdBanner
         raise SystemExit('home navigation end marker missing')
     s = s.replace(old_nav_end, new_nav_end, 1)
 
-# Arabic RTL navigation: forward/enter points left and back points right.
+# Add one additional banner inside the home page content, separated from tappable cards.
+home_inline_marker = """        const SizedBox(height: 18),\n        const Text(\n          'اختر القسم',"""
+home_inline_ad = """        const SizedBox(height: 18),\n        const AcademyAdBanner(),\n        const SizedBox(height: 18),\n        const Text(\n          'اختر القسم',"""
+if "const AcademyAdBanner(),\n        const SizedBox(height: 18),\n        const Text(\n          'اختر القسم'" not in s:
+    if home_inline_marker not in s:
+        raise SystemExit('home inline ad marker missing')
+    s = s.replace(home_inline_marker, home_inline_ad, 1)
+
 s = s.replace("Icons.arrow_back_rounded", "Icons.chevron_left_rounded")
 s = s.replace("وأختبار", "واختبار")
 
@@ -56,7 +61,7 @@ p.write_text(s)
 
 pub = Path('pubspec.yaml')
 t = pub.read_text()
-t = re.sub(r'^version:\s*.*$', 'version: 1.0.3+4', t, flags=re.M)
+t = re.sub(r'^version:\s*.*$', 'version: 1.0.4+5', t, flags=re.M)
 t = re.sub(r'^\s*google_mobile_ads:\s*.*$', '  google_mobile_ads: ^9.1.0', t, flags=re.M)
 pub.write_text(t)
-print('Home ad order, compact banners and RTL navigation fixes applied')
+print('Added safe inline home banner and kept all previous ad/RTL fixes')
