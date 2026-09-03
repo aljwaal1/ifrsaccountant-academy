@@ -17,8 +17,7 @@ if old_init in s:
 elif "if (!await AdService.instance.initialize()) return;" not in s:
     raise SystemExit('banner initialization marker missing')
 
-# Keep banner compact inside Scaffold.bottomNavigationBar. Without an explicit
-# outer height, Container(alignment: ...) can expand vertically on inner pages.
+# Keep banner compact inside Scaffold.bottomNavigationBar.
 old_banner = """    return Container(\n      color: Colors.white,\n      padding: const EdgeInsets.only(top: 6, bottom: 6),\n      alignment: Alignment.center,\n      child: SizedBox(\n        width: ad.size.width.toDouble(),\n        height: ad.size.height.toDouble(),\n        child: AdWidget(ad: ad),\n      ),\n    );"""
 new_banner = """    return SizedBox(\n      width: double.infinity,\n      height: ad.size.height.toDouble() + 12,\n      child: ColoredBox(\n        color: Colors.white,\n        child: Center(\n          child: SizedBox(\n            width: ad.size.width.toDouble(),\n            height: ad.size.height.toDouble(),\n            child: AdWidget(ad: ad),\n          ),\n        ),\n      ),\n    );"""
 if old_banner in s:
@@ -26,17 +25,28 @@ if old_banner in s:
 elif "height: ad.size.height.toDouble() + 12" not in s:
     raise SystemExit('banner layout marker missing')
 
-# Arabic RTL navigation: forward/enter arrows point left; back points right.
+# On the home page put the navigation menu first and the ad below it.
+old_home_order = """        children: [\n          const AcademyAdBanner(),\n          Divider(height: 1, color: Colors.grey.shade300),\n          NavigationBar("""
+new_home_order = """        children: [\n          NavigationBar("""
+if old_home_order in s:
+    s = s.replace(old_home_order, new_home_order, 1)
+
+old_nav_end = """            ],\n          ),\n        ],\n      ),"""
+new_nav_end = """            ],\n          ),\n          Divider(height: 1, color: Colors.grey.shade300),\n          const SafeArea(\n            top: false,\n            child: AcademyAdBanner(),\n          ),\n        ],\n      ),"""
+# Replace only the first occurrence, which is the home bottom navigation column.
+if "const SafeArea(\n            top: false,\n            child: AcademyAdBanner()," not in s:
+    if old_nav_end not in s:
+        raise SystemExit('home navigation end marker missing')
+    s = s.replace(old_nav_end, new_nav_end, 1)
+
+# Arabic RTL navigation.
 s = s.replace("Icons.arrow_back_rounded", "Icons.chevron_left_rounded")
 s = s.replace("'وأختبار يساعدك", "'واختبار يساعدك")
 
-# Explicit right-pointing back arrows for nested pages.
 track_appbar = """      appBar: AppBar(\n        title: Text(track['title']?.toString() ?? ''),\n        centerTitle: true,"""
 track_appbar_new = """      appBar: AppBar(\n        leading: IconButton(\n          icon: const Icon(Icons.chevron_right_rounded),\n          tooltip: 'رجوع',\n          onPressed: () => Navigator.maybePop(context),\n        ),\n        title: Text(track['title']?.toString() ?? ''),\n        centerTitle: true,"""
 if track_appbar in s:
     s = s.replace(track_appbar, track_appbar_new, 1)
-elif "tooltip: 'رجوع'" not in s:
-    raise SystemExit('track appbar marker missing')
 
 lesson_appbar = """      appBar: AppBar(\n        title: Text(lessonCode(lesson)),\n        backgroundColor: const Color(0xFF0F3D56),"""
 lesson_appbar_new = """      appBar: AppBar(\n        leading: IconButton(\n          icon: const Icon(Icons.chevron_right_rounded),\n          tooltip: 'رجوع',\n          onPressed: () => Navigator.maybePop(context),\n        ),\n        title: Text(lessonCode(lesson)),\n        backgroundColor: const Color(0xFF0F3D56),"""
@@ -47,7 +57,7 @@ p.write_text(s)
 
 pub = Path('pubspec.yaml')
 t = pub.read_text()
-t = re.sub(r'^version:\s*.*$', 'version: 1.0.2+3', t, flags=re.M)
+t = re.sub(r'^version:\s*.*$', 'version: 1.0.3+4', t, flags=re.M)
 t = re.sub(r'^\s*google_mobile_ads:\s*.*$', '  google_mobile_ads: ^9.1.0', t, flags=re.M)
 pub.write_text(t)
-print('AdMob banner sizing and RTL navigation fixes applied')
+print('Home ad order, compact banners and RTL navigation fixes applied')
