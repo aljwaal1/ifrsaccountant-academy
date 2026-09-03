@@ -40,20 +40,28 @@ jobs:
       - name: Generate Android project
         run: flutter create --platforms=android --org com.explapp --no-pub .
 
-      - name: Configure Android exactly like proven app
+      - name: Configure Android with exact Google Play package
         shell: bash
         run: |
           set -euo pipefail
           python3 <<'PY'
           from pathlib import Path
+          import re
+
+          expected = 'com.explapp.accountantacademy'
           gradle = Path('android/app/build.gradle.kts')
           g = gradle.read_text()
-          g = g.replace('applicationId = "com.explapp.accountant_academy_dynamic"', 'applicationId = "com.explapp.accountantacademy"')
+          g, count = re.subn(r'applicationId\s*=\s*"[^"]+"', f'applicationId = "{expected}"', g, count=1)
+          if count != 1:
+              raise SystemExit('Could not set Android applicationId')
+          if f'applicationId = "{expected}"' not in g:
+              raise SystemExit('Expected Google Play package was not written')
           g = g.replace('minSdk = flutter.minSdkVersion', 'minSdk = 24')
           g = g.replace('signingConfig = signingConfigs.getByName("debug")', '')
           if 'androidx.work:work-runtime:2.11.2' not in g:
               g += '\n\ndependencies {\n    implementation("androidx.work:work-runtime:2.11.2")\n}\n'
           gradle.write_text(g)
+          print('applicationId locked to', expected)
 
           manifest = Path('android/app/src/main/AndroidManifest.xml')
           m = manifest.read_text()
@@ -63,6 +71,7 @@ jobs:
               m = m.replace('</application>', '        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>\n    </application>', 1)
           manifest.write_text(m)
           PY
+          grep -F 'applicationId = "com.explapp.accountantacademy"' android/app/build.gradle.kts
 
       - name: Install final professional launcher icon
         shell: bash
@@ -120,6 +129,18 @@ jobs:
           ./gradlew app:assembleRelease app:bundleRelease
           find ../build -type f \( -name '*.apk' -o -name '*.aab' \) -print
 
+      - name: Verify exact package before signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          test -x "$AAPT"
+          APK=build/app/outputs/apk/release/app-release-unsigned.apk
+          test -s "$APK"
+          PACKAGE=$("$AAPT" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)
+          echo "Built Android package: $PACKAGE"
+          test "$PACKAGE" = 'com.explapp.accountantacademy'
+
       - name: Sign APK and AAB with permanent upload key
         shell: bash
         env:
@@ -129,13 +150,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p output
-          APK=$(find build -type f -name '*release*.apk' | head -1)
-          AAB=$(find build -type f -name '*release*.aab' | head -1)
-          test -n "$APK"
-          test -n "$AAB"
+          APK=build/app/outputs/apk/release/app-release-unsigned.apk
+          AAB=build/app/outputs/bundle/release/app-release.aab
+          test -s "$APK"
+          test -s "$AAB"
 
-          cp "$APK" output/accountant-academy-v1.0.7-signed.apk
-          cp "$AAB" output/accountant-academy-v1.0.7-signed.aab
+          cp "$APK" output/accountant-academy-v1.0.8-signed.apk
+          cp "$AAB" output/accountant-academy-v1.0.8-signed.aab
 
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -x "$APKSIGNER"
@@ -148,7 +169,7 @@ jobs:
             --v1-signing-enabled true \
             --v2-signing-enabled true \
             --v3-signing-enabled true \
-            output/accountant-academy-v1.0.7-signed.apk
+            output/accountant-academy-v1.0.8-signed.apk
 
           jarsigner \
             -keystore /tmp/accountant-academy-upload-key.jks \
@@ -156,21 +177,26 @@ jobs:
             -keypass:env ANDROID_KEY_PASSWORD \
             -sigalg SHA256withRSA \
             -digestalg SHA-256 \
-            output/accountant-academy-v1.0.7-signed.aab \
+            output/accountant-academy-v1.0.8-signed.aab \
             "$ANDROID_KEY_ALIAS"
 
-      - name: Verify final signatures
+      - name: Verify final package and signatures
         shell: bash
         run: |
           set -euo pipefail
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          PACKAGE=$("$AAPT" dump badging output/accountant-academy-v1.0.8-signed.apk | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)
+          echo "Final signed package: $PACKAGE" | tee output/package-verification.txt
+          test "$PACKAGE" = 'com.explapp.accountantacademy'
+
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
-          "$APKSIGNER" verify --verbose --print-certs output/accountant-academy-v1.0.7-signed.apk | tee output/apk-signature-verification.txt
+          "$APKSIGNER" verify --verbose --print-certs output/accountant-academy-v1.0.8-signed.apk | tee output/apk-signature-verification.txt
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' output/apk-signature-verification.txt
           grep -q 'Verified using v3 scheme (APK Signature Scheme v3): true' output/apk-signature-verification.txt
-          jarsigner -verify -certs output/accountant-academy-v1.0.7-signed.aab | tee output/aab-signature-verification.txt
+          jarsigner -verify -certs output/accountant-academy-v1.0.8-signed.aab | tee output/aab-signature-verification.txt
           grep -qi 'jar verified' output/aab-signature-verification.txt
-          sha256sum output/accountant-academy-v1.0.7-signed.apk output/accountant-academy-v1.0.7-signed.aab | tee output/SHA256SUMS.txt
-          echo 'APK v2/v3 signature verified and AAB signature verified.'
+          sha256sum output/accountant-academy-v1.0.8-signed.apk output/accountant-academy-v1.0.8-signed.aab | tee output/SHA256SUMS.txt
+          echo 'Package, APK v2/v3 signature, and AAB signature verified.'
 
       - name: Remove restored private key
         if: always()
@@ -178,6 +204,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: accountant-academy-v1.0.7-signed-release
+          name: accountant-academy-v1.0.8-signed-release
           path: output/*
           retention-days: 7
