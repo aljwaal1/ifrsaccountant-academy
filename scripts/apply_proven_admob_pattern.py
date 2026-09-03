@@ -4,11 +4,23 @@ import re
 p = Path('lib/main.dart')
 s = p.read_text()
 
+# Start AdMob/UMP immediately after the first frame can render, without ever
+# blocking application startup. The banner widgets reuse the same Future.
+if "import 'dart:async';" not in s:
+    s = s.replace("import 'dart:convert';\n", "import 'dart:async';\nimport 'dart:convert';\n", 1)
+
 if "import 'ad_service.dart';" not in s:
     marker = "import 'package:url_launcher/url_launcher.dart';\n"
     if marker not in s:
         raise SystemExit('url_launcher import marker missing')
     s = s.replace(marker, marker + "\nimport 'ad_service.dart';\n", 1)
+
+old_main = """void main() {\n  WidgetsFlutterBinding.ensureInitialized();\n  runApp(const AccountantAcademyApp());\n}"""
+new_main = """void main() {\n  WidgetsFlutterBinding.ensureInitialized();\n  runApp(const AccountantAcademyApp());\n  unawaited(AdService.instance.initialize());\n}"""
+if old_main in s:
+    s = s.replace(old_main, new_main, 1)
+elif "unawaited(AdService.instance.initialize());" not in s:
+    raise SystemExit('main startup marker missing')
 
 old_init = """    try {\n      await MobileAds.instance.initialize();\n      final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);"""
 new_init = """    try {\n      if (!await AdService.instance.initialize()) return;\n      final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);"""
@@ -24,6 +36,7 @@ if old_banner in s:
 elif "height: ad.size.height.toDouble() + 12" not in s:
     raise SystemExit('banner layout marker missing')
 
+# Home: navigation menu first, exactly one banner below it.
 old_home_order = """        children: [\n          const AcademyAdBanner(),\n          Divider(height: 1, color: Colors.grey.shade300),\n          NavigationBar("""
 new_home_order = """        children: [\n          NavigationBar("""
 if old_home_order in s:
@@ -36,14 +49,13 @@ if "const SafeArea(\n            top: false,\n            child: AcademyAdBanner
         raise SystemExit('home navigation end marker missing')
     s = s.replace(old_nav_end, new_nav_end, 1)
 
-# Add one additional banner inside the home page content, separated from tappable cards.
-home_inline_marker = """        const SizedBox(height: 18),\n        const Text(\n          'اختر القسم',"""
-home_inline_ad = """        const SizedBox(height: 18),\n        const AcademyAdBanner(),\n        const SizedBox(height: 18),\n        const Text(\n          'اختر القسم',"""
-if "const AcademyAdBanner(),\n        const SizedBox(height: 18),\n        const Text(\n          'اختر القسم'" not in s:
-    if home_inline_marker not in s:
-        raise SystemExit('home inline ad marker missing')
-    s = s.replace(home_inline_marker, home_inline_ad, 1)
+# Remove the accidental extra banner from inside the home content.
+inline_home_ad = """        const SizedBox(height: 18),\n        const AcademyAdBanner(),\n        const SizedBox(height: 18),\n        const Text(\n          'اختر القسم',"""
+plain_home = """        const SizedBox(height: 18),\n        const Text(\n          'اختر القسم',"""
+if inline_home_ad in s:
+    s = s.replace(inline_home_ad, plain_home, 1)
 
+# Arabic RTL navigation: forward/enter points left and back points right.
 s = s.replace("Icons.arrow_back_rounded", "Icons.chevron_left_rounded")
 s = s.replace("وأختبار", "واختبار")
 
@@ -61,7 +73,7 @@ p.write_text(s)
 
 pub = Path('pubspec.yaml')
 t = pub.read_text()
-t = re.sub(r'^version:\s*.*$', 'version: 1.0.4+5', t, flags=re.M)
+t = re.sub(r'^version:\s*.*$', 'version: 1.0.5+6', t, flags=re.M)
 t = re.sub(r'^\s*google_mobile_ads:\s*.*$', '  google_mobile_ads: ^9.1.0', t, flags=re.M)
 pub.write_text(t)
-print('Added safe inline home banner and kept all previous ad/RTL fixes')
+print('Preloaded AdMob safely; kept one bottom home banner and all RTL fixes')
