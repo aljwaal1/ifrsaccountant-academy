@@ -33,15 +33,14 @@ if old_home_order in s:
 
 old_nav_end = """            ],\n          ),\n        ],\n      ),"""
 new_nav_end = """            ],\n          ),\n          Divider(height: 1, color: Colors.grey.shade300),\n          const SafeArea(\n            top: false,\n            child: AcademyAdBanner(),\n          ),\n        ],\n      ),"""
-# Replace only the first occurrence, which is the home bottom navigation column.
 if "const SafeArea(\n            top: false,\n            child: AcademyAdBanner()," not in s:
     if old_nav_end not in s:
         raise SystemExit('home navigation end marker missing')
     s = s.replace(old_nav_end, new_nav_end, 1)
 
-# Arabic RTL navigation.
+# Arabic RTL navigation: forward/enter points left and back points right.
 s = s.replace("Icons.arrow_back_rounded", "Icons.chevron_left_rounded")
-s = s.replace("'وأختبار يساعدك", "'واختبار يساعدك")
+s = s.replace("وأختبار", "واختبار")
 
 track_appbar = """      appBar: AppBar(\n        title: Text(track['title']?.toString() ?? ''),\n        centerTitle: true,"""
 track_appbar_new = """      appBar: AppBar(\n        leading: IconButton(\n          icon: const Icon(Icons.chevron_right_rounded),\n          tooltip: 'رجوع',\n          onPressed: () => Navigator.maybePop(context),\n        ),\n        title: Text(track['title']?.toString() ?? ''),\n        centerTitle: true,"""
