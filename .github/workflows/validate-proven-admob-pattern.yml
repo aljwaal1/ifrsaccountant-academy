@@ -8,6 +8,7 @@ on:
     paths:
       - 'scripts/apply_proven_admob_pattern.py'
       - 'lib/ad_service.dart'
+      - 'assets/app_icon_512.webp.b64'
       - '.github/workflows/validate-proven-admob-pattern.yml'
 
 permissions:
@@ -72,6 +73,23 @@ jobs:
           manifest.write_text(m)
           PY
 
+      - name: Install final custom launcher icon
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d assets/app_icon_512.webp.b64 > /tmp/accountant_academy_icon.webp
+          test -s /tmp/accountant_academy_icon.webp
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            dir="android/app/src/main/res/mipmap-${density}"
+            mkdir -p "$dir"
+            rm -f "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"
+            cp /tmp/accountant_academy_icon.webp "$dir/ic_launcher.webp"
+            cp /tmp/accountant_academy_icon.webp "$dir/ic_launcher_round.webp"
+          done
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          file /tmp/accountant_academy_icon.webp
+
       - name: Get packages
         run: flutter pub get
 
@@ -97,11 +115,11 @@ jobs:
           AAB=$(find build -type f -name '*release*.aab' | head -1)
           test -n "$APK"
           test -n "$AAB"
-          cp "$APK" output/accountant-academy-v1.0.1-unsigned.apk
-          cp "$AAB" output/accountant-academy-v1.0.1-unsigned.aab
+          cp "$APK" output/accountant-academy-v1.0.6-unsigned.apk
+          cp "$AAB" output/accountant-academy-v1.0.6-unsigned.aab
 
       - uses: actions/upload-artifact@v4
         with:
-          name: accountant-academy-proven-admob-unsigned
+          name: accountant-academy-v1.0.6-custom-icon-unsigned
           path: output/*
           retention-days: 1
