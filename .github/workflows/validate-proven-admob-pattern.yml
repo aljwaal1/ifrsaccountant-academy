@@ -1,4 +1,4 @@
-name: Validate Proven AdMob Pattern
+name: Build Signed Academy Release
 
 on:
   workflow_dispatch:
@@ -9,13 +9,14 @@ on:
       - 'scripts/apply_proven_admob_pattern.py'
       - 'lib/ad_service.dart'
       - 'assets/app_icon_512.webp.b64'
+      - 'pubspec.yaml'
       - '.github/workflows/validate-proven-admob-pattern.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  validate:
+  build-signed-release:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -24,16 +25,6 @@ jobs:
 
       - name: Apply proven Matching AdMob pattern
         run: python3 scripts/apply_proven_admob_pattern.py
-
-      - name: Commit source changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -- lib/main.dart pubspec.yaml
-          if ! git diff --cached --quiet; then
-            git commit -m "Use proven AdMob initialization pattern"
-            git push
-          fi
 
       - uses: actions/setup-java@v4
         with:
@@ -102,24 +93,91 @@ jobs:
           ./gradlew app:dependencyInsight --dependency androidx.work:work-runtime --configuration releaseRuntimeClasspath | tee /tmp/workmanager.txt
           grep -q 'androidx.work:work-runtime:2.11.2' /tmp/workmanager.txt
 
-      - name: Build unsigned release APK and AAB
+      - name: Validate signing secrets and restore upload key
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > /tmp/accountant-academy-upload-key.jks
+          test -s /tmp/accountant-academy-upload-key.jks
+          keytool -list -keystore /tmp/accountant-academy-upload-key.jks -storepass:env ANDROID_KEYSTORE_PASSWORD -alias "$ANDROID_KEY_ALIAS" >/dev/null
+          echo 'Signing key restored and alias verified.'
+
+      - name: Build release APK and AAB
         working-directory: android
         run: |
+          set -euo pipefail
           ./gradlew app:assembleRelease app:bundleRelease
           find ../build -type f \( -name '*.apk' -o -name '*.aab' \) -print
 
-      - name: Collect unsigned artifacts
+      - name: Sign APK and AAB with permanent upload key
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          set -euo pipefail
           mkdir -p output
           APK=$(find build -type f -name '*release*.apk' | head -1)
           AAB=$(find build -type f -name '*release*.aab' | head -1)
           test -n "$APK"
           test -n "$AAB"
-          cp "$APK" output/accountant-academy-v1.0.6-unsigned.apk
-          cp "$AAB" output/accountant-academy-v1.0.6-unsigned.aab
+
+          cp "$APK" output/accountant-academy-v1.0.6-signed.apk
+          cp "$AAB" output/accountant-academy-v1.0.6-signed.aab
+
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          test -x "$APKSIGNER"
+
+          "$APKSIGNER" sign \
+            --ks /tmp/accountant-academy-upload-key.jks \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+            --key-pass env:ANDROID_KEY_PASSWORD \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            output/accountant-academy-v1.0.6-signed.apk
+
+          jarsigner \
+            -keystore /tmp/accountant-academy-upload-key.jks \
+            -storepass:env ANDROID_KEYSTORE_PASSWORD \
+            -keypass:env ANDROID_KEY_PASSWORD \
+            -sigalg SHA256withRSA \
+            -digestalg SHA-256 \
+            output/accountant-academy-v1.0.6-signed.aab \
+            "$ANDROID_KEY_ALIAS"
+
+      - name: Verify final signatures
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --verbose --print-certs output/accountant-academy-v1.0.6-signed.apk | tee output/apk-signature-verification.txt
+          grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' output/apk-signature-verification.txt
+          grep -q 'Verified using v3 scheme (APK Signature Scheme v3): true' output/apk-signature-verification.txt
+          jarsigner -verify -strict -certs output/accountant-academy-v1.0.6-signed.aab > output/aab-signature-verification.txt
+          sha256sum output/accountant-academy-v1.0.6-signed.apk output/accountant-academy-v1.0.6-signed.aab | tee output/SHA256SUMS.txt
+          echo 'APK v2/v3 signature verified and AAB signature verified.'
+
+      - name: Remove restored private key
+        if: always()
+        run: rm -f /tmp/accountant-academy-upload-key.jks
 
       - uses: actions/upload-artifact@v4
         with:
-          name: accountant-academy-v1.0.6-custom-icon-unsigned
+          name: accountant-academy-v1.0.6-signed-release
           path: output/*
-          retention-days: 1
+          retention-days: 7
