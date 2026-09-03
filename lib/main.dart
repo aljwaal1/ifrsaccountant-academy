@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,6 +13,7 @@ import 'ad_service.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const AccountantAcademyApp());
+  unawaited(AdService.instance.initialize());
 }
 
 const developerEmail = 'fastunlocked2017@gmail.com';
@@ -712,8 +714,6 @@ class TracksView extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: 18),
-        const AcademyAdBanner(),
         const SizedBox(height: 18),
         const Text(
           'اختر القسم',
