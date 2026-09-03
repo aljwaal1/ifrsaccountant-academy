@@ -453,7 +453,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     },
                     icon: Icon(page == pages.length - 1
                         ? Icons.rocket_launch_rounded
-                        : Icons.arrow_back_rounded),
+                        : Icons.chevron_left_rounded),
                     label: Text(page == pages.length - 1 ? 'ابدأ التعلم' : 'التالي'),
                   ),
                 ),
@@ -651,14 +651,18 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
   Widget build(BuildContext context) {
     final ad = _banner;
     if (!_loaded || ad == null) return const SizedBox.shrink();
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.only(top: 6, bottom: 6),
-      alignment: Alignment.center,
-      child: SizedBox(
-        width: ad.size.width.toDouble(),
-        height: ad.size.height.toDouble(),
-        child: AdWidget(ad: ad),
+    return SizedBox(
+      width: double.infinity,
+      height: ad.size.height.toDouble() + 12,
+      child: ColoredBox(
+        color: Colors.white,
+        child: Center(
+          child: SizedBox(
+            width: ad.size.width.toDouble(),
+            height: ad.size.height.toDouble(),
+            child: AdWidget(ad: ad),
+          ),
+        ),
       ),
     );
   }
@@ -906,6 +910,11 @@ class TrackLessonsPage extends StatelessWidget {
     return Scaffold(
       bottomNavigationBar: const SafeArea(top: false, child: AcademyAdBanner()),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_right_rounded),
+          tooltip: 'رجوع',
+          onPressed: () => Navigator.maybePop(context),
+        ),
         title: Text(track['title']?.toString() ?? ''),
         centerTitle: true,
         backgroundColor: style.color,
@@ -1036,6 +1045,11 @@ class _LessonPageState extends State<LessonPage> {
     return Scaffold(
       bottomNavigationBar: const SafeArea(top: false, child: AcademyAdBanner()),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_right_rounded),
+          tooltip: 'رجوع',
+          onPressed: () => Navigator.maybePop(context),
+        ),
         title: Text(lessonCode(lesson)),
         backgroundColor: const Color(0xFF0F3D56),
         foregroundColor: Colors.white,
