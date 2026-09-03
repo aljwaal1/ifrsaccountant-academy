@@ -364,7 +364,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         icon: Icons.school_rounded,
         title: 'تعلّم ثم اختبر نفسك',
         description:
-            'كل درس يجمع بين ملخص مركز، شرح تفصيلي، وأختبار يساعدك على تثبيت المعلومة وقياس فهمك خطوة بخطوة.',
+            'كل درس يجمع بين ملخص مركز، شرح تفصيلي، واختبار يساعدك على تثبيت المعلومة وقياس فهمك خطوة بخطوة.',
         accent: Color(0xFF00A6A6),
       ),
       const _IntroCard(
