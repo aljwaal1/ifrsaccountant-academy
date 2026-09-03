@@ -8,7 +8,7 @@ on:
     paths:
       - 'scripts/apply_proven_admob_pattern.py'
       - 'lib/ad_service.dart'
-      - 'assets/app_icon_512.webp.b64'
+      - 'assets/app_icon_final.svg'
       - 'pubspec.yaml'
       - '.github/workflows/validate-proven-admob-pattern.yml'
 
@@ -64,22 +64,24 @@ jobs:
           manifest.write_text(m)
           PY
 
-      - name: Install final custom launcher icon
+      - name: Install final professional launcher icon
         shell: bash
         run: |
           set -euo pipefail
-          base64 -d assets/app_icon_512.webp.b64 > /tmp/accountant_academy_icon.webp
-          test -s /tmp/accountant_academy_icon.webp
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq librsvg2-bin
+          test -s assets/app_icon_final.svg
+          declare -A sizes=( [mdpi]=48 [hdpi]=72 [xhdpi]=96 [xxhdpi]=144 [xxxhdpi]=192 )
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             dir="android/app/src/main/res/mipmap-${density}"
             mkdir -p "$dir"
-            rm -f "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"
-            cp /tmp/accountant_academy_icon.webp "$dir/ic_launcher.webp"
-            cp /tmp/accountant_academy_icon.webp "$dir/ic_launcher_round.webp"
+            rm -f "$dir/ic_launcher.png" "$dir/ic_launcher_round.png" "$dir/ic_launcher.webp" "$dir/ic_launcher_round.webp"
+            rsvg-convert -w "${sizes[$density]}" -h "${sizes[$density]}" assets/app_icon_final.svg -o "$dir/ic_launcher.png"
+            cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"
+            file "$dir/ic_launcher.png"
           done
           rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
-          file /tmp/accountant_academy_icon.webp
 
       - name: Get packages
         run: flutter pub get
