@@ -40,7 +40,7 @@ jobs:
       - name: Generate Android project
         run: flutter create --platforms=android --org com.explapp --no-pub .
 
-      - name: Configure Android with exact Google Play package
+      - name: Configure Android with exact Google Play package and app name
         shell: bash
         run: |
           set -euo pipefail
@@ -61,17 +61,22 @@ jobs:
           if 'androidx.work:work-runtime:2.11.2' not in g:
               g += '\n\ndependencies {\n    implementation("androidx.work:work-runtime:2.11.2")\n}\n'
           gradle.write_text(g)
-          print('applicationId locked to', expected)
 
           manifest = Path('android/app/src/main/AndroidManifest.xml')
           m = manifest.read_text()
+          m, label_count = re.subn(r'android:label="[^"]*"', 'android:label="أكاديمية المحاسب"', m, count=1)
+          if label_count != 1:
+              raise SystemExit('Could not set Android app label')
           if 'android.permission.INTERNET' not in m:
               m = m.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">', '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />', 1)
           if 'com.google.android.gms.ads.APPLICATION_ID' not in m:
               m = m.replace('</application>', '        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>\n    </application>', 1)
           manifest.write_text(m)
+          print('applicationId locked to', expected)
+          print('app label locked to أكاديمية المحاسب')
           PY
           grep -F 'applicationId = "com.explapp.accountantacademy"' android/app/build.gradle.kts
+          grep -F 'android:label="أكاديمية المحاسب"' android/app/src/main/AndroidManifest.xml
 
       - name: Install final professional launcher icon
         shell: bash
@@ -87,7 +92,7 @@ jobs:
             rm -f "$dir/ic_launcher.png" "$dir/ic_launcher_round.png" "$dir/ic_launcher.webp" "$dir/ic_launcher_round.webp"
             rsvg-convert -w "${sizes[$density]}" -h "${sizes[$density]}" assets/app_icon_final.svg -o "$dir/ic_launcher.png"
             cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"
-            file "$dir/ic_launcher.png"
+            test -s "$dir/ic_launcher.png"
           done
           rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
@@ -127,19 +132,20 @@ jobs:
         run: |
           set -euo pipefail
           ./gradlew app:assembleRelease app:bundleRelease
-          find ../build -type f \( -name '*.apk' -o -name '*.aab' \) -print
 
       - name: Verify exact package before signing
         shell: bash
         run: |
           set -euo pipefail
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
-          test -x "$AAPT"
           APK=build/app/outputs/apk/release/app-release-unsigned.apk
           test -s "$APK"
           PACKAGE=$("$AAPT" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)
+          LABEL=$("$AAPT" dump badging "$APK" | sed -n "s/^application-label:'\([^']*\)'.*/\1/p" | head -1)
           echo "Built Android package: $PACKAGE"
+          echo "Built Android label: $LABEL"
           test "$PACKAGE" = 'com.explapp.accountantacademy'
+          test "$LABEL" = 'أكاديمية المحاسب'
 
       - name: Sign APK and AAB with permanent upload key
         shell: bash
@@ -152,15 +158,10 @@ jobs:
           mkdir -p output
           APK=build/app/outputs/apk/release/app-release-unsigned.apk
           AAB=build/app/outputs/bundle/release/app-release.aab
-          test -s "$APK"
-          test -s "$AAB"
-
-          cp "$APK" output/accountant-academy-v1.0.8-signed.apk
-          cp "$AAB" output/accountant-academy-v1.0.8-signed.aab
+          cp "$APK" output/accountant-academy-v1.0.9-signed.apk
+          cp "$AAB" output/accountant-academy-v1.0.9-signed.aab
 
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
-          test -x "$APKSIGNER"
-
           "$APKSIGNER" sign \
             --ks /tmp/accountant-academy-upload-key.jks \
             --ks-key-alias "$ANDROID_KEY_ALIAS" \
@@ -169,7 +170,7 @@ jobs:
             --v1-signing-enabled true \
             --v2-signing-enabled true \
             --v3-signing-enabled true \
-            output/accountant-academy-v1.0.8-signed.apk
+            output/accountant-academy-v1.0.9-signed.apk
 
           jarsigner \
             -keystore /tmp/accountant-academy-upload-key.jks \
@@ -177,7 +178,7 @@ jobs:
             -keypass:env ANDROID_KEY_PASSWORD \
             -sigalg SHA256withRSA \
             -digestalg SHA-256 \
-            output/accountant-academy-v1.0.8-signed.aab \
+            output/accountant-academy-v1.0.9-signed.aab \
             "$ANDROID_KEY_ALIAS"
 
       - name: Verify final package and signatures
@@ -185,18 +186,20 @@ jobs:
         run: |
           set -euo pipefail
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
-          PACKAGE=$("$AAPT" dump badging output/accountant-academy-v1.0.8-signed.apk | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)
+          PACKAGE=$("$AAPT" dump badging output/accountant-academy-v1.0.9-signed.apk | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)
+          LABEL=$("$AAPT" dump badging output/accountant-academy-v1.0.9-signed.apk | sed -n "s/^application-label:'\([^']*\)'.*/\1/p" | head -1)
           echo "Final signed package: $PACKAGE" | tee output/package-verification.txt
+          echo "Final app label: $LABEL" | tee -a output/package-verification.txt
           test "$PACKAGE" = 'com.explapp.accountantacademy'
+          test "$LABEL" = 'أكاديمية المحاسب'
 
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
-          "$APKSIGNER" verify --verbose --print-certs output/accountant-academy-v1.0.8-signed.apk | tee output/apk-signature-verification.txt
+          "$APKSIGNER" verify --verbose --print-certs output/accountant-academy-v1.0.9-signed.apk | tee output/apk-signature-verification.txt
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' output/apk-signature-verification.txt
           grep -q 'Verified using v3 scheme (APK Signature Scheme v3): true' output/apk-signature-verification.txt
-          jarsigner -verify -certs output/accountant-academy-v1.0.8-signed.aab | tee output/aab-signature-verification.txt
+          jarsigner -verify -certs output/accountant-academy-v1.0.9-signed.aab | tee output/aab-signature-verification.txt
           grep -qi 'jar verified' output/aab-signature-verification.txt
-          sha256sum output/accountant-academy-v1.0.8-signed.apk output/accountant-academy-v1.0.8-signed.aab | tee output/SHA256SUMS.txt
-          echo 'Package, APK v2/v3 signature, and AAB signature verified.'
+          sha256sum output/accountant-academy-v1.0.9-signed.apk output/accountant-academy-v1.0.9-signed.aab | tee output/SHA256SUMS.txt
 
       - name: Remove restored private key
         if: always()
@@ -204,6 +207,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: accountant-academy-v1.0.8-signed-release
+          name: accountant-academy-v1.0.9-signed-release
           path: output/*
           retention-days: 7
