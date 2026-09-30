@@ -598,8 +598,8 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
   bool _loaded = false;
 
   String get _testUnitId => Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/6300978111'
-      : 'ca-app-pub-3940256099942544/2934735716';
+      ? 'ca-app-pub-3082968903080396/5516120283'
+      : 'ca-app-pub-3082968903080396/5516120283';
 
   @override
   void didChangeDependencies() {
