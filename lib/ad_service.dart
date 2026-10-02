@@ -11,7 +11,19 @@ class AdService {
 
   Future<bool>? _initialization;
 
-  Future<bool> initialize() => _initialization ??= _initialize();
+  Future<bool> initialize() async {
+    final existing = _initialization;
+    if (existing != null) return existing;
+
+    final attempt = _initialize();
+    _initialization = attempt;
+    final success = await attempt;
+
+    // Cache only a successful initialization. If consent is not ready yet
+    // or initialization fails temporarily, allow the next banner load to retry.
+    if (!success) _initialization = null;
+    return success;
+  }
 
   Future<bool> _initialize() async {
     try {
