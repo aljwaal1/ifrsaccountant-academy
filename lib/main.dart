@@ -595,7 +595,7 @@ class AcademyAdBanner extends StatefulWidget {
 
 class _AcademyAdBannerState extends State<AcademyAdBanner> {
   static const _productionBannerId =
-      'ca-app-pub-3082968903080396/5516120283';
+      'ca-app-pub-3082968903080396/2655269212';
   static const _androidTestBannerId =
       'ca-app-pub-3940256099942544/6300978111';
 
