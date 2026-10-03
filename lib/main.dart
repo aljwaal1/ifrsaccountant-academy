@@ -379,10 +379,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
     ];
 
     return Scaffold(
-      bottomNavigationBar: const SafeArea(
-        top: false,
-        child: AcademyAdBanner(),
-      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
