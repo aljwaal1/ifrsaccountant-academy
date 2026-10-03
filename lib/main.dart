@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -593,61 +594,123 @@ class AcademyAdBanner extends StatefulWidget {
 }
 
 class _AcademyAdBannerState extends State<AcademyAdBanner> {
+  static const _productionBannerId =
+      'ca-app-pub-3082968903080396/5516120283';
+  static const _androidTestBannerId =
+      'ca-app-pub-3940256099942544/6300978111';
+
   BannerAd? _banner;
+  Timer? _retryTimer;
   int? _width;
   bool _loaded = false;
+  bool _loading = false;
 
-  String get _testUnitId => Platform.isAndroid
-      ? 'ca-app-pub-3082968903080396/5516120283'
-      : 'ca-app-pub-3082968903080396/5516120283';
+  String get _bannerUnitId =>
+      kReleaseMode ? _productionBannerId : _androidTestBannerId;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final width = MediaQuery.sizeOf(context).width.truncate();
-    if (_width == width && _banner != null) return;
+    final width = MediaQuery.sizeOf(context).width.truncate().clamp(320, 1200);
+    if (_width == width && (_banner != null || _loading)) return;
     _width = width;
-    _load(width);
+    unawaited(_load(width));
+  }
+
+  void _scheduleRetry(Duration delay) {
+    _retryTimer?.cancel();
+    if (!mounted) return;
+    _retryTimer = Timer(delay, () {
+      final width = _width;
+      if (mounted && width != null) {
+        unawaited(_load(width));
+      }
+    });
   }
 
   Future<void> _load(int width) async {
+    if (_loading || !mounted) return;
+    _loading = true;
+
     try {
-      if (!await AdService.instance.initialize()) return;
-      final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
-    if (!mounted || size == null) return;
-    await _banner?.dispose();
-    final ad = BannerAd(
-      adUnitId: _testUnitId,
-      request: const AdRequest(),
-      size: size,
-      listener: BannerAdListener(
-        onAdLoaded: (_) {
-          if (mounted) setState(() => _loaded = true);
-        },
-        onAdFailedToLoad: (ad, _) {
-          ad.dispose();
-          if (mounted) setState(() {
-            _loaded = false;
-            _banner = null;
-          });
-        },
-      ),
-    );
-      _banner = ad;
+      final canRequestAds = await AdService.instance.initialize();
+      if (!mounted) return;
+
+      if (!canRequestAds) {
+        debugPrint('AdMob: consent not ready yet; retrying banner request.');
+        _scheduleRetry(const Duration(seconds: 4));
+        return;
+      }
+
+      final size =
+          await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+      if (!mounted) return;
+
+      if (size == null) {
+        debugPrint('AdMob: adaptive banner size unavailable; retrying.');
+        _scheduleRetry(const Duration(seconds: 6));
+        return;
+      }
+
+      _retryTimer?.cancel();
+      _retryTimer = null;
+      await _banner?.dispose();
+      _banner = null;
       _loaded = false;
+
+      final ad = BannerAd(
+        adUnitId: _bannerUnitId,
+        request: const AdRequest(),
+        size: size,
+        listener: BannerAdListener(
+          onAdLoaded: (ad) {
+            debugPrint('AdMob: banner loaded successfully.');
+            _retryTimer?.cancel();
+            _retryTimer = null;
+            if (mounted) {
+              setState(() {
+                _banner = ad as BannerAd;
+                _loaded = true;
+              });
+            }
+          },
+          onAdFailedToLoad: (ad, error) {
+            debugPrint(
+              'AdMob: banner failed code=${error.code}, '
+              'domain=${error.domain}, message=${error.message}',
+            );
+            ad.dispose();
+            if (identical(_banner, ad)) {
+              _banner = null;
+            }
+            if (mounted) {
+              setState(() => _loaded = false);
+              _scheduleRetry(const Duration(seconds: 10));
+            }
+          },
+        ),
+      );
+
+      _banner = ad;
       await ad.load();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('AdMob: banner load exception: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (mounted) {
         setState(() {
           _loaded = false;
           _banner = null;
         });
+        _scheduleRetry(const Duration(seconds: 8));
       }
+    } finally {
+      _loading = false;
     }
   }
 
   @override
   void dispose() {
+    _retryTimer?.cancel();
     _banner?.dispose();
     super.dispose();
   }
@@ -656,6 +719,7 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
   Widget build(BuildContext context) {
     final ad = _banner;
     if (!_loaded || ad == null) return const SizedBox.shrink();
+
     return SizedBox(
       width: double.infinity,
       height: ad.size.height.toDouble() + 12,
