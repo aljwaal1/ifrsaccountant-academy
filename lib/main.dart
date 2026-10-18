@@ -130,11 +130,17 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
       final parsed = jsonDecode(body) as Map<String, dynamic>;
       if (parsed['tracks'] is! List || _lessonCount(parsed) == 0 ||
           _contentVersion(parsed) <= _contentVersion(content)) return;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('academy_content_json', body);
       final now = DateTime.now();
-      await prefs.setString('academy_last_update', now.toIso8601String());
-      await prefs.setInt('academy_last_check_ms', now.millisecondsSinceEpoch);
+      // Android preferences may be unavailable on an existing installation.
+      // Never prevent fresh lessons being displayed because persistence fails.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('academy_content_json', body);
+        await prefs.setString('academy_last_update', now.toIso8601String());
+        await prefs.setInt('academy_last_check_ms', now.millisecondsSinceEpoch);
+      } catch (error) {
+        debugPrint('Content cache unavailable: $error');
+      }
       if (mounted) setState(() {
         content = parsed;
         lastUpdate = now.toIso8601String();
@@ -277,14 +283,33 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
   }
 
   Future<void> _resetContent() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('academy_content_json');
-    await prefs.setString('academy_last_update', 'المحتوى الداخلي');
+    // Reset only the locally downloaded override, never the full built-in
+    // catalog. The legacy fallback has just three lessons.
+    Map<String, dynamic>? bundled;
+    try {
+      final raw = await rootBundle.loadString('assets/academy_content.json');
+      bundled = await compute(_decodeAcademyJson, raw);
+      if (bundled['tracks'] is! List || _lessonCount(bundled) == 0) {
+        throw const FormatException('Invalid bundled catalog');
+      }
+    } catch (error) {
+      debugPrint('Unable to restore bundled catalog: $error');
+      _message('تعذر استعادة المحتوى المدمج، لم تتغير دروسك');
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('academy_content_json');
+      await prefs.setString('academy_last_update', 'المحتوى الداخلي');
+    } catch (error) {
+      debugPrint('Unable to clear saved override: $error');
+    }
+    if (!mounted) return;
     setState(() {
-      content = jsonDecode(fallbackContentJson) as Map<String, dynamic>;
+      content = bundled!;
       lastUpdate = 'المحتوى الداخلي';
     });
-    _message('تم الرجوع للمحتوى الداخلي');
+    _message('تم الرجوع إلى المحتوى الكامل المدمج');
   }
 
   String _two(int n) => n.toString().padLeft(2, '0');
