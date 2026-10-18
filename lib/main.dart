@@ -285,7 +285,7 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
   Future<void> _resetContent() async {
     // Reset only the locally downloaded override, never the full built-in
     // catalog. The legacy fallback has just three lessons.
-    Map<String, dynamic>? bundled;
+    late final Map<String, dynamic> bundled;
     try {
       final raw = await rootBundle.loadString('assets/academy_content.json');
       bundled = await compute(_decodeAcademyJson, raw);
@@ -306,7 +306,7 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
     }
     if (!mounted) return;
     setState(() {
-      content = bundled!;
+      content = bundled;
       lastUpdate = 'المحتوى الداخلي';
     });
     _message('تم الرجوع إلى المحتوى الكامل المدمج');
