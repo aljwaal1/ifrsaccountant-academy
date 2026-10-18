@@ -33,9 +33,9 @@ jobs:
           import re
           p = Path('pubspec.yaml')
           s = p.read_text()
-          s = re.sub(r'^version:\s*.*$', 'version: 1.0.18+19', s, flags=re.M)
+          s = re.sub(r'^version:\s*.*$', 'version: 1.0.19+20', s, flags=re.M)
           p.write_text(s)
-          print('pubspec version forced to 1.0.18+19')
+          print('pubspec version forced to 1.0.19+20')
           PY
 
       - uses: actions/setup-java@v4
@@ -65,8 +65,8 @@ jobs:
           g, count = re.subn(r'applicationId\s*=\s*"[^"]+"', f'applicationId = "{expected}"', g, count=1)
           if count != 1:
               raise SystemExit('Could not set Android applicationId')
-          g, vc_count = re.subn(r'versionCode\s*=\s*[^\n]+', 'versionCode = 19', g, count=1)
-          g, vn_count = re.subn(r'versionName\s*=\s*[^\n]+', 'versionName = "1.0.18"', g, count=1)
+          g, vc_count = re.subn(r'versionCode\s*=\s*[^\n]+', 'versionCode = 20', g, count=1)
+          g, vn_count = re.subn(r'versionName\s*=\s*[^\n]+', 'versionName = "1.0.19"', g, count=1)
           if vc_count != 1 or vn_count != 1:
               raise SystemExit('Could not force Android version')
           g = g.replace('minSdk = flutter.minSdkVersion', 'minSdk = 24')
@@ -87,8 +87,8 @@ jobs:
           manifest.write_text(m)
           PY
           grep -F 'applicationId = "com.explapp.accountantacademy"' android/app/build.gradle.kts
-          grep -F 'versionCode = 19' android/app/build.gradle.kts
-          grep -F 'versionName = "1.0.18"' android/app/build.gradle.kts
+          grep -F 'versionCode = 20' android/app/build.gradle.kts
+          grep -F 'versionName = "1.0.19"' android/app/build.gradle.kts
           grep -F 'android:label="أكاديمية المحاسب"' android/app/src/main/AndroidManifest.xml
 
       - name: Install bright professional launcher icon
@@ -169,8 +169,8 @@ jobs:
           VERSION_NAME=$(printf '%s\n' "$BADGING" | sed -n "s/^package:.*versionName='\([^']*\)'.*/\1/p" | head -1)
           LABEL=$(printf '%s\n' "$BADGING" | sed -n "s/^application-label:'\([^']*\)'.*/\1/p" | head -1)
           test "$PACKAGE" = 'com.explapp.accountantacademy'
-          test "$VERSION_CODE" = '19'
-          test "$VERSION_NAME" = '1.0.18'
+          test "$VERSION_CODE" = '20'
+          test "$VERSION_NAME" = '1.0.19'
           test "$LABEL" = 'أكاديمية المحاسب'
 
       - name: Sign APK and AAB with permanent upload key
@@ -182,8 +182,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p output
-          cp build/app/outputs/apk/release/app-release-unsigned.apk output/accountant-academy-v1.0.18-build19-signed.apk
-          cp build/app/outputs/bundle/release/app-release.aab output/accountant-academy-v1.0.18-build19-signed.aab
+          cp build/app/outputs/apk/release/app-release-unsigned.apk output/accountant-academy-v1.0.19-build20-signed.apk
+          cp build/app/outputs/bundle/release/app-release.aab output/accountant-academy-v1.0.19-build20-signed.aab
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           "$APKSIGNER" sign \
             --ks /tmp/accountant-academy-upload-key.jks \
@@ -193,14 +193,14 @@ jobs:
             --v1-signing-enabled true \
             --v2-signing-enabled true \
             --v3-signing-enabled true \
-            output/accountant-academy-v1.0.18-build19-signed.apk
+            output/accountant-academy-v1.0.19-build20-signed.apk
           jarsigner \
             -keystore /tmp/accountant-academy-upload-key.jks \
             -storepass:env ANDROID_KEYSTORE_PASSWORD \
             -keypass:env ANDROID_KEY_PASSWORD \
             -sigalg SHA256withRSA \
             -digestalg SHA-256 \
-            output/accountant-academy-v1.0.18-build19-signed.aab \
+            output/accountant-academy-v1.0.19-build20-signed.aab \
             "$ANDROID_KEY_ALIAS"
 
       - name: Verify final package version and signatures
@@ -208,7 +208,7 @@ jobs:
         run: |
           set -euo pipefail
           AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
-          APK=output/accountant-academy-v1.0.18-build19-signed.apk
+          APK=output/accountant-academy-v1.0.19-build20-signed.apk
           BADGING=$("$AAPT" dump badging "$APK")
           PACKAGE=$(printf '%s\n' "$BADGING" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)
           VERSION_CODE=$(printf '%s\n' "$BADGING" | sed -n "s/^package:.*versionCode='\([^']*\)'.*/\1/p" | head -1)
@@ -221,16 +221,16 @@ jobs:
             echo "Final app label: $LABEL"
           } | tee output/package-verification.txt
           test "$PACKAGE" = 'com.explapp.accountantacademy'
-          test "$VERSION_CODE" = '19'
-          test "$VERSION_NAME" = '1.0.18'
+          test "$VERSION_CODE" = '20'
+          test "$VERSION_NAME" = '1.0.19'
           test "$LABEL" = 'أكاديمية المحاسب'
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee output/apk-signature-verification.txt
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' output/apk-signature-verification.txt
           grep -q 'Verified using v3 scheme (APK Signature Scheme v3): true' output/apk-signature-verification.txt
-          jarsigner -verify -certs output/accountant-academy-v1.0.18-build19-signed.aab | tee output/aab-signature-verification.txt
+          jarsigner -verify -certs output/accountant-academy-v1.0.19-build20-signed.aab | tee output/aab-signature-verification.txt
           grep -qi 'jar verified' output/aab-signature-verification.txt
-          sha256sum output/accountant-academy-v1.0.18-build19-signed.apk output/accountant-academy-v1.0.18-build19-signed.aab | tee output/SHA256SUMS.txt
+          sha256sum output/accountant-academy-v1.0.19-build20-signed.apk output/accountant-academy-v1.0.19-build20-signed.aab | tee output/SHA256SUMS.txt
 
       - name: Remove restored private key
         if: always()
@@ -238,6 +238,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: accountant-academy-v1.0.18-build19-signed-release
+          name: accountant-academy-v1.0.19-build20-signed-release
           path: output/*
           retention-days: 7
