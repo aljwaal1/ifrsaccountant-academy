@@ -670,6 +670,13 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
   static const _androidTestBannerId =
       'ca-app-pub-3940256099942544/6300978111';
 
+  // Preload one spare banner so moving into another section need not
+  // wait for a completely new network request.
+  static BannerAd? _spare;
+  static int? _spareWidth;
+  static bool _prefetching = false;
+  static DateTime? _spareLoadedAt;
+
   BannerAd? _banner;
   Timer? _retryTimer;
   int? _width;
@@ -679,6 +686,34 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
 
   String get _bannerUnitId =>
       kReleaseMode ? _productionBannerId : _androidTestBannerId;
+
+  static void _prefetch(int width, AdSize size, String unitId) {
+    if (_prefetching || _spare != null) return;
+    _prefetching = true;
+    final next = BannerAd(
+      adUnitId: unitId,
+      request: const AdRequest(),
+      size: size,
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          _prefetching = false;
+          _spare = ad as BannerAd;
+          _spareWidth = width;
+          _spareLoadedAt = DateTime.now();
+        },
+        onAdFailedToLoad: (ad, error) {
+          _prefetching = false;
+          ad.dispose();
+          debugPrint('AdMob: spare banner failed code=${error.code}');
+        },
+      ),
+    );
+    next.load().catchError((Object error) {
+      _prefetching = false;
+      next.dispose();
+      debugPrint('AdMob: spare banner exception: $error');
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -731,6 +766,31 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
 
       _retryTimer?.cancel();
       _retryTimer = null;
+
+      // Prepared ad is never attached to another AdWidget, so ownership
+      // can safely pass to this route.
+      if (_spare != null && _spareWidth == width &&
+          _spare!.size.width == size.width &&
+          _spare!.size.height == size.height &&
+          _spareLoadedAt != null &&
+          DateTime.now().difference(_spareLoadedAt!) < const Duration(minutes: 45)) {
+        final ready = _spare!;
+        _spare = null;
+        _spareWidth = null;
+        _spareLoadedAt = null;
+        if (!mounted) { ready.dispose(); return; }
+        setState(() {
+          _banner = ready;
+          _loaded = true;
+        });
+        _prefetch(width, size, _bannerUnitId);
+        return;
+      }
+      if (_spare != null && _spareWidth != width) {
+        _spare?.dispose();
+        _spare = null;
+        _spareWidth = null;
+      }
       await _banner?.dispose();
       _banner = null;
       _loaded = false;
@@ -743,6 +803,7 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
           onAdLoaded: (ad) {
             if (!mounted || attempt != _attempt) { ad.dispose(); return; }
             debugPrint('AdMob: banner loaded successfully.');
+            _prefetch(width, size, _bannerUnitId);
             _retryTimer?.cancel();
             _retryTimer = null;
             if (mounted) {
