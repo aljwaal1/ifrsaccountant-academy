@@ -16,7 +16,7 @@ class AdService {
   Future<bool>? _consentInitialization;
 
   Future<InitializationStatus> _initializeSdk() {
-    return _sdkInitialization ??= MobileAds.instance.initialize();
+    return _sdkInitialization ??= MobileAds.instance.initialize().timeout(const Duration(seconds: 20));
   }
 
   Future<bool> initialize() async {
