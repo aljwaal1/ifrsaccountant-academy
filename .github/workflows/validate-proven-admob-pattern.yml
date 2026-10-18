@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ux-onboarding-ads-2026-09-02
+          ref: academy-v1-0-17-ads-content
 
       - name: Prepare release version
         run: |
