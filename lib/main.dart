@@ -179,8 +179,7 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
   Future<void> _updateContent() async {
     if (!_isValidContentUrl(contentUrl)) {
       contentUrl = defaultContentUrl;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('academy_content_url', defaultContentUrl);
+      // URL fallback remains usable even if Android preferences are unavailable.
     }
     if (!_isValidContentUrl(contentUrl)) {
       _message('تعذر تحديد رابط تحديث المحتوى');
@@ -196,13 +195,17 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
       if (parsed['tracks'] is! List || _lessonCount(parsed) == 0) throw Exception('ملف غير صالح');
       if (_contentVersion(parsed) < _contentVersion(content)) throw Exception('نسخة المحتوى أقدم من المحتوى الحالي');
       final lessonCount = _lessonCount(parsed);
-      final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
       final updateText =
           '${now.year}-${_two(now.month)}-${_two(now.day)} ${_two(now.hour)}:${_two(now.minute)}';
-      await prefs.setString('academy_content_json', body);
-      await prefs.setString('academy_last_update', updateText);
-      await prefs.setInt('academy_last_check_ms', now.millisecondsSinceEpoch);
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('academy_content_json', body);
+        await prefs.setString('academy_last_update', updateText);
+        await prefs.setInt('academy_last_check_ms', now.millisecondsSinceEpoch);
+      } catch (error) {
+        debugPrint('Content saving unavailable; still showing new lessons: $error');
+      }
       setState(() {
         content = parsed;
         lastUpdate = updateText;
@@ -249,9 +252,13 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
           continue;
         }
         jsonDecode(body);
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('academy_content_url', url);
         contentUrl = url;
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('academy_content_url', url);
+        } catch (error) {
+          debugPrint('URL caching unavailable: $error');
+        }
         return body;
       } catch (e) {
         client.close(force: true);
