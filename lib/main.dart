@@ -27,6 +27,9 @@ const fallbackContentUrls = [
   'https://cdn.jsdelivr.net/gh/aljwaal1/accountant-academy-content@main/academy_content.json',
 ];
 
+Map<String, dynamic> _decodeAcademyJson(String source) =>
+    jsonDecode(source) as Map<String, dynamic>;
+
 String lessonCode(Map<String, dynamic> lesson) {
   return (lesson['code'] ?? lesson['standardCode'] ?? '').toString();
 }
@@ -84,30 +87,55 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
   }
 
   Future<void> _loadSavedContent() async {
-    final prefs = await SharedPreferences.getInstance();
+    // Never block the initial screen indefinitely on disk or content parsing.
     try {
-      final bundled = jsonDecode(await rootBundle.loadString('assets/academy_content.json')) as Map<String, dynamic>;
-      if (bundled['tracks'] is List) content = bundled;
-    } catch (error) { debugPrint('Bundled content unavailable: $error'); }
-    final saved = prefs.getString('academy_content_json');
-    final savedUrl = prefs.getString('academy_content_url');
-    contentUrl = _isValidContentUrl(savedUrl)
-        ? savedUrl!.trim()
-        : defaultContentUrl;
-    lastUpdate = prefs.getString('academy_last_update') ?? 'المحتوى الداخلي';
-    showOnboarding = !(prefs.getBool('academy_onboarding_seen') ?? false);
-    final lastCheckMs = prefs.getInt('academy_last_check_ms');
-    updateDue = lastCheckMs == null ||
-        DateTime.now().millisecondsSinceEpoch - lastCheckMs >=
-            const Duration(days: 3).inMilliseconds;
-    if (saved != null && saved.trim().isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance()
+          .timeout(const Duration(seconds: 6));
+      showOnboarding = !(prefs.getBool('academy_onboarding_seen') ?? false);
+      final savedUrl = prefs.getString('academy_content_url');
+      contentUrl = _isValidContentUrl(savedUrl)
+          ? savedUrl!.trim()
+          : defaultContentUrl;
+      lastUpdate = prefs.getString('academy_last_update') ?? 'المحتوى الداخلي';
+      final lastCheckMs = prefs.getInt('academy_last_check_ms');
+      updateDue = lastCheckMs == null ||
+          DateTime.now().millisecondsSinceEpoch - lastCheckMs >=
+              const Duration(days: 3).inMilliseconds;
+
+      // Decode large lesson catalogs off the UI thread to avoid freezing.
       try {
-        final parsed = jsonDecode(saved) as Map<String, dynamic>;
-        if (parsed['tracks'] is List && _contentVersion(parsed) >= _contentVersion(content)) content = parsed;
-      } catch (_) { /* retain bundled content */ }
+        final bundledText = await rootBundle
+            .loadString('assets/academy_content.json')
+            .timeout(const Duration(seconds: 8));
+        final bundled = await compute(_decodeAcademyJson, bundledText)
+            .timeout(const Duration(seconds: 8));
+        if (bundled['tracks'] is List && _lessonCount(bundled) > 0) {
+          content = bundled;
+        }
+      } catch (error) {
+        debugPrint('Bundled content unavailable; retaining fallback: $error');
+      }
+
+      final saved = prefs.getString('academy_content_json');
+      if (saved != null && saved.isNotEmpty) {
+        try {
+          final parsed = await compute(_decodeAcademyJson, saved)
+              .timeout(const Duration(seconds: 8));
+          if (parsed['tracks'] is List && _lessonCount(parsed) > 0 &&
+              _contentVersion(parsed) >= _contentVersion(content)) {
+            content = parsed;
+          }
+        } catch (error) {
+          debugPrint('Saved content invalid; retaining bundled catalog: $error');
+        }
+      }
+    } catch (error) {
+      debugPrint('Content startup fallback: $error');
+    } finally {
+      if (mounted) setState(() => loading = false);
+      // Network is optional and must never block offline lessons.
+      unawaited(_syncContentOnLaunch());
     }
-    if (mounted) setState(() => loading = false);
-    unawaited(_syncContentOnLaunch());
   }
 
   int _contentVersion(Map<String, dynamic> data) =>
