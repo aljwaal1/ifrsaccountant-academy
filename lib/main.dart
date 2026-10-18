@@ -87,53 +87,36 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
   }
 
   Future<void> _loadSavedContent() async {
-    // Never block the initial screen indefinitely on disk or content parsing.
+    // Read the offline catalog before preferences, which may be incompatible
+    // on some Android installations. Never let preferences hide lessons.
+    try {
+      final raw = await rootBundle.loadString('assets/academy_content.json');
+      final bundled = await compute(_decodeAcademyJson, raw);
+      if (bundled['tracks'] is List && _lessonCount(bundled) > 0) {
+        content = bundled;
+      }
+    } catch (error) {
+      debugPrint('Bundled content unavailable: $error');
+    }
     try {
       final prefs = await SharedPreferences.getInstance()
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 4));
       showOnboarding = !(prefs.getBool('academy_onboarding_seen') ?? false);
       final savedUrl = prefs.getString('academy_content_url');
-      contentUrl = _isValidContentUrl(savedUrl)
-          ? savedUrl!.trim()
-          : defaultContentUrl;
-      lastUpdate = prefs.getString('academy_last_update') ?? 'المحتوى الداخلي';
-      final lastCheckMs = prefs.getInt('academy_last_check_ms');
-      updateDue = lastCheckMs == null ||
-          DateTime.now().millisecondsSinceEpoch - lastCheckMs >=
-              const Duration(days: 3).inMilliseconds;
-
-      // Decode large lesson catalogs off the UI thread to avoid freezing.
-      try {
-        final bundledText = await rootBundle
-            .loadString('assets/academy_content.json')
-            .timeout(const Duration(seconds: 8));
-        final bundled = await compute(_decodeAcademyJson, bundledText)
-            .timeout(const Duration(seconds: 8));
-        if (bundled['tracks'] is List && _lessonCount(bundled) > 0) {
-          content = bundled;
-        }
-      } catch (error) {
-        debugPrint('Bundled content unavailable; retaining fallback: $error');
-      }
-
+      if (_isValidContentUrl(savedUrl)) contentUrl = savedUrl!.trim();
+      lastUpdate = prefs.getString('academy_last_update') ?? lastUpdate;
       final saved = prefs.getString('academy_content_json');
       if (saved != null && saved.isNotEmpty) {
-        try {
-          final parsed = await compute(_decodeAcademyJson, saved)
-              .timeout(const Duration(seconds: 8));
-          if (parsed['tracks'] is List && _lessonCount(parsed) > 0 &&
-              _contentVersion(parsed) >= _contentVersion(content)) {
-            content = parsed;
-          }
-        } catch (error) {
-          debugPrint('Saved content invalid; retaining bundled catalog: $error');
+        final parsed = await compute(_decodeAcademyJson, saved);
+        if (parsed['tracks'] is List && _lessonCount(parsed) > 0 &&
+            _contentVersion(parsed) >= _contentVersion(content)) {
+          content = parsed;
         }
       }
     } catch (error) {
-      debugPrint('Content startup fallback: $error');
+      debugPrint('Preferences failed; using full bundled lessons: $error');
     } finally {
       if (mounted) setState(() => loading = false);
-      // Network is optional and must never block offline lessons.
       unawaited(_syncContentOnLaunch());
     }
   }
