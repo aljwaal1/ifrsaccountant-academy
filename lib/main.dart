@@ -675,6 +675,7 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
   int? _width;
   bool _loaded = false;
   bool _loading = false;
+  int _attempt = 0;
 
   String get _bannerUnitId =>
       kReleaseMode ? _productionBannerId : _androidTestBannerId;
@@ -682,7 +683,7 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final width = MediaQuery.sizeOf(context).width.truncate().clamp(320, 1200);
+    final width = MediaQuery.sizeOf(context).width.floor().clamp(1, 1200);
     if (_width == width && (_banner != null || _loading)) return;
     _width = width;
     unawaited(_load(width));
@@ -702,9 +703,11 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
   Future<void> _load(int width) async {
     if (_loading || !mounted) return;
     _loading = true;
+    final attempt = ++_attempt;
 
     try {
-      final canRequestAds = await AdService.instance.initialize();
+      final canRequestAds = await AdService.instance.initialize()
+          .timeout(const Duration(seconds: 22));
       if (!mounted) return;
 
       if (!canRequestAds) {
@@ -713,9 +716,12 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
         return;
       }
 
-      final size =
-          await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
-      if (!mounted) return;
+      // Adaptive can be unavailable on some devices. Fall back to a
+      // standard 320x50 banner rather than silently hiding the ad slot.
+      final adaptive = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width)
+          .timeout(const Duration(seconds: 8), onTimeout: () => null);
+      final size = adaptive ?? (width >= 320 ? AdSize.banner : null);
+      if (!mounted || attempt != _attempt) return;
 
       if (size == null) {
         debugPrint('AdMob: adaptive banner size unavailable; retrying.');
@@ -735,6 +741,7 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
         size: size,
         listener: BannerAdListener(
           onAdLoaded: (ad) {
+            if (!mounted || attempt != _attempt) { ad.dispose(); return; }
             debugPrint('AdMob: banner loaded successfully.');
             _retryTimer?.cancel();
             _retryTimer = null;
@@ -746,6 +753,7 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
             }
           },
           onAdFailedToLoad: (ad, error) {
+            if (!mounted || attempt != _attempt) { ad.dispose(); return; }
             debugPrint(
               'AdMob: banner failed code=${error.code}, '
               'domain=${error.domain}, message=${error.message}',
@@ -781,6 +789,7 @@ class _AcademyAdBannerState extends State<AcademyAdBanner> {
 
   @override
   void dispose() {
+    _attempt++;
     _retryTimer?.cancel();
     _banner?.dispose();
     super.dispose();
