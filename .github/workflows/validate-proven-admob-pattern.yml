@@ -5,10 +5,12 @@ on:
   push:
     branches:
       - ux-onboarding-ads-2026-09-02
+      - academy-v1-0-17-ads-content
     paths:
       - 'scripts/apply_proven_admob_pattern.py'
       - 'lib/main.dart'
       - 'lib/ad_service.dart'
+      - 'lib/interstitial_service.dart'
       - 'assets/app_icon_final.svg'
       - 'pubspec.yaml'
       - '.github/workflows/validate-proven-admob-pattern.yml'
@@ -64,7 +66,7 @@ jobs:
           if count != 1:
               raise SystemExit('Could not set Android applicationId')
           g, vc_count = re.subn(r'versionCode\s*=\s*[^\n]+', 'versionCode = 18', g, count=1)
-          g, vn_count = re.subn(r'versionName\s*=\s*[^\n]+', 'versionName = "1.0.16"', g, count=1)
+          g, vn_count = re.subn(r'versionName\s*=\s*[^\n]+', 'versionName = "1.0.17"', g, count=1)
           if vc_count != 1 or vn_count != 1:
               raise SystemExit('Could not force Android version')
           g = g.replace('minSdk = flutter.minSdkVersion', 'minSdk = 24')
@@ -86,7 +88,7 @@ jobs:
           PY
           grep -F 'applicationId = "com.explapp.accountantacademy"' android/app/build.gradle.kts
           grep -F 'versionCode = 18' android/app/build.gradle.kts
-          grep -F 'versionName = "1.0.16"' android/app/build.gradle.kts
+          grep -F 'versionName = "1.0.17"' android/app/build.gradle.kts
           grep -F 'android:label="أكاديمية المحاسب"' android/app/src/main/AndroidManifest.xml
 
       - name: Install bright professional launcher icon
