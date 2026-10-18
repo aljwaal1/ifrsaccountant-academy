@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ad_service.dart';
+import 'interstitial_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +38,7 @@ class AccountantAcademyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      navigatorObservers: [AcademyInterstitialObserver()],
       title: 'أكاديمية المحاسب الدولي',
       theme: ThemeData(
         useMaterial3: true,
@@ -83,6 +85,10 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
 
   Future<void> _loadSavedContent() async {
     final prefs = await SharedPreferences.getInstance();
+    try {
+      final bundled = jsonDecode(await rootBundle.loadString('assets/academy_content.json')) as Map<String, dynamic>;
+      if (bundled['tracks'] is List) content = bundled;
+    } catch (error) { debugPrint('Bundled content unavailable: $error'); }
     final saved = prefs.getString('academy_content_json');
     final savedUrl = prefs.getString('academy_content_url');
     contentUrl = _isValidContentUrl(savedUrl)
@@ -97,12 +103,33 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
     if (saved != null && saved.trim().isNotEmpty) {
       try {
         final parsed = jsonDecode(saved) as Map<String, dynamic>;
-        content = parsed;
-      } catch (_) {
-        content = jsonDecode(fallbackContentJson) as Map<String, dynamic>;
-      }
+        if (parsed['tracks'] is List && _contentVersion(parsed) >= _contentVersion(content)) content = parsed;
+      } catch (_) { /* retain bundled content */ }
     }
     if (mounted) setState(() => loading = false);
+    unawaited(_syncContentOnLaunch());
+  }
+
+  int _contentVersion(Map<String, dynamic> data) =>
+      int.tryParse(data['version'].toString()) ?? 0;
+
+  Future<void> _syncContentOnLaunch() async {
+    try {
+      final body = await _downloadContent();
+      final parsed = jsonDecode(body) as Map<String, dynamic>;
+      if (parsed['tracks'] is! List || _lessonCount(parsed) == 0 ||
+          _contentVersion(parsed) <= _contentVersion(content)) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('academy_content_json', body);
+      final now = DateTime.now();
+      await prefs.setString('academy_last_update', now.toIso8601String());
+      await prefs.setInt('academy_last_check_ms', now.millisecondsSinceEpoch);
+      if (mounted) setState(() {
+        content = parsed;
+        lastUpdate = now.toIso8601String();
+        updateDue = false;
+      });
+    } catch (error) { debugPrint('Content sync skipped: $error'); }
   }
 
   Future<void> _finishOnboarding() async {
@@ -155,7 +182,8 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
     try {
       final body = await _downloadContent();
       final parsed = jsonDecode(body) as Map<String, dynamic>;
-      if (parsed['tracks'] is! List) throw Exception('ملف غير صالح');
+      if (parsed['tracks'] is! List || _lessonCount(parsed) == 0) throw Exception('ملف غير صالح');
+      if (_contentVersion(parsed) < _contentVersion(content)) throw Exception('نسخة المحتوى أقدم من المحتوى الحالي');
       final lessonCount = _lessonCount(parsed);
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
