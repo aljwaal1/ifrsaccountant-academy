@@ -34,36 +34,123 @@ String lessonCode(Map<String, dynamic> lesson) {
   return (lesson['code'] ?? lesson['standardCode'] ?? '').toString();
 }
 
-class AccountantAcademyApp extends StatelessWidget {
+class AccountantAcademyApp extends StatefulWidget {
   const AccountantAcademyApp({super.key});
 
   @override
+  State<AccountantAcademyApp> createState() => _AccountantAcademyAppState();
+}
+
+class _AccountantAcademyAppState extends State<AccountantAcademyApp> {
+  final AcademyInterstitialObserver _adsObserver = AcademyInterstitialObserver();
+  double fontScale = 1.0;
+  bool darkMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_restoreReadingPreferences());
+  }
+
+  Future<void> _restoreReadingPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      setState(() {
+        fontScale = (prefs.getDouble('academy_font_scale') ?? 1.0)
+            .clamp(0.85, 1.45);
+        darkMode = prefs.getBool('academy_dark_mode') ?? false;
+      });
+    } catch (error) {
+      debugPrint('Reading preferences unavailable: $error');
+    }
+  }
+
+  void _setFontScale(double value) {
+    setState(() => fontScale = value.clamp(0.85, 1.45));
+    unawaited(_saveReadingPreferences());
+  }
+
+  void _setDarkMode(bool value) {
+    setState(() => darkMode = value);
+    unawaited(_saveReadingPreferences());
+  }
+
+  Future<void> _saveReadingPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('academy_font_scale', fontScale);
+      await prefs.setBool('academy_dark_mode', darkMode);
+    } catch (error) {
+      debugPrint('Could not save reading preferences: $error');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final lightTheme = ThemeData(
+      useMaterial3: true,
+      fontFamily: 'Arial',
+      colorScheme: const ColorScheme.light(
+        primary: Color(0xFF0F3D56),
+        secondary: Color(0xFF00A6A6),
+        tertiary: Color(0xFFE1A83A),
+        surface: Color(0xFFF4F7F8),
+      ),
+      scaffoldBackgroundColor: const Color(0xFFF4F7F8),
+    );
+    final nightTheme = ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      fontFamily: 'Arial',
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF00A6A6),
+        brightness: Brightness.dark,
+      ),
+      scaffoldBackgroundColor: const Color(0xFF101820),
+    );
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      navigatorObservers: [AcademyInterstitialObserver()],
+      navigatorObservers: [_adsObserver],
       title: 'أكاديمية المحاسب الدولي',
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Arial',
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF0F3D56),
-          secondary: Color(0xFF00A6A6),
-          tertiary: Color(0xFFE1A83A),
-          surface: Color(0xFFF4F7F8),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF4F7F8),
-      ),
-      home: const Directionality(
+      theme: lightTheme,
+      darkTheme: nightTheme,
+      themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        final systemScale = media.textScaler.scale(1.0);
+        final combined = (systemScale * fontScale).clamp(0.8, 2.5);
+        return MediaQuery(
+          data: media.copyWith(textScaler: TextScaler.linear(combined)),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+      home: Directionality(
         textDirection: TextDirection.rtl,
-        child: AcademyHomePage(),
+        child: AcademyHomePage(
+          fontScale: fontScale,
+          darkMode: darkMode,
+          onFontScaleChanged: _setFontScale,
+          onDarkModeChanged: _setDarkMode,
+        ),
       ),
     );
   }
 }
 
 class AcademyHomePage extends StatefulWidget {
-  const AcademyHomePage({super.key});
+  const AcademyHomePage({
+    super.key,
+    required this.fontScale,
+    required this.darkMode,
+    required this.onFontScaleChanged,
+    required this.onDarkModeChanged,
+  });
+  final double fontScale;
+  final bool darkMode;
+  final ValueChanged<double> onFontScaleChanged;
+  final ValueChanged<bool> onDarkModeChanged;
 
   @override
   State<AcademyHomePage> createState() => _AcademyHomePageState();
@@ -342,6 +429,12 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
         onReset: _resetContent,
       ),
       const DeveloperView(),
+      ReadingSettingsView(
+        fontScale: widget.fontScale,
+        darkMode: widget.darkMode,
+        onFontScaleChanged: widget.onFontScaleChanged,
+        onDarkModeChanged: widget.onDarkModeChanged,
+      ),
     ];
     return Scaffold(
       appBar: AppBar(
@@ -385,6 +478,11 @@ class _AcademyHomePageState extends State<AcademyHomePage> {
                 icon: Icon(Icons.mail_outline),
                 selectedIcon: Icon(Icons.mail),
                 label: 'المطور',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings),
+                label: 'الإعدادات',
               ),
             ],
           ),
@@ -563,7 +661,7 @@ class _IntroCard extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 680),
         padding: const EdgeInsets.all(26),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(30),
           boxShadow: const [
             BoxShadow(color: Color(0x22000000), blurRadius: 30, offset: Offset(0, 12)),
@@ -611,7 +709,7 @@ class _SectionsIntroCard extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 680),
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(30),
         boxShadow: const [
           BoxShadow(color: Color(0x22000000), blurRadius: 30, offset: Offset(0, 12)),
@@ -1338,7 +1436,7 @@ class LongView extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(18),
             ),
             child: Text(p, style: const TextStyle(fontSize: 16, height: 1.7)),
@@ -1486,7 +1584,7 @@ class _Bullet extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -1497,6 +1595,88 @@ class _Bullet extends StatelessWidget {
           Expanded(child: Text(text, style: const TextStyle(height: 1.5))),
         ],
       ),
+    );
+  }
+}
+
+class ReadingSettingsView extends StatelessWidget {
+  const ReadingSettingsView({
+    super.key,
+    required this.fontScale,
+    required this.darkMode,
+    required this.onFontScaleChanged,
+    required this.onDarkModeChanged,
+  });
+
+  final double fontScale;
+  final bool darkMode;
+  final ValueChanged<double> onFontScaleChanged;
+  final ValueChanged<bool> onDarkModeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListView(
+      padding: const EdgeInsets.all(18),
+      children: [
+        Text('إعدادات القراءة',
+            style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 8),
+        Text('اضبط حجم الكتابة والمظهر بما يناسبك. يتم حفظ الاختيارات تلقائيًا.'),
+        const SizedBox(height: 18),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('حجم الخط', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.text_decrease),
+                    Expanded(
+                      child: Slider(
+                        min: 0.85,
+                        max: 1.45,
+                        divisions: 12,
+                        value: fontScale.clamp(0.85, 1.45),
+                        label: '${(fontScale * 100).round()}%',
+                        onChanged: onFontScaleChanged,
+                      ),
+                    ),
+                    const Icon(Icons.text_increase),
+                  ],
+                ),
+                Text('معاينة حجم الكتابة',
+                  style: TextStyle(
+                    color: scheme.onSurface,
+                    fontSize: 16,
+                    height: 1.6,
+                  ),
+                ),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton(
+                    onPressed: () => onFontScaleChanged(1.0),
+                    child: const Text('إعادة الحجم الافتراضي'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: SwitchListTile(
+            title: const Text('الوضع الليلي'),
+            subtitle: const Text('خلفية داكنة مريحة للقراءة'),
+            secondary: Icon(darkMode ? Icons.dark_mode : Icons.light_mode),
+            value: darkMode,
+            onChanged: onDarkModeChanged,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1585,7 +1765,7 @@ class _LastCheckCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -1628,7 +1808,7 @@ class _UpdateStatusCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -1674,7 +1854,7 @@ class _HelpBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(18),
       ),
       child: const Text(
@@ -1760,7 +1940,7 @@ class _DeveloperViewState extends State<DeveloperView> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
